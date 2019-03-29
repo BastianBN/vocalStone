@@ -1,0 +1,6 @@
+appdirs==1.4.3
+docutils==0.14
+numpy==1.16.2
+scikit-learn==0.20.3
+scikit-sound==0.2.3
+scipy==1.2.1
