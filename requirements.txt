@@ -1,6 +1,16 @@
 appdirs==1.4.3
+cycler==0.10.0
 docutils==0.14
+future==0.17.1
+iso8601==0.1.12
+kiwisolver==1.0.1
+matplotlib==3.0.3
 numpy==1.16.2
+pyparsing==2.3.1
+pyserial==3.4
+python-dateutil==2.8.0
+PyYAML==5.1
 scikit-learn==0.20.3
 scikit-sound==0.2.3
 scipy==1.2.1
+six==1.12.0
