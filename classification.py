@@ -19,3 +19,5 @@ modele.fit(X, Y)
 
 X_test = [x['coefs'] for x in data_test['fichiers']]
 Y_test = [x['type']  for x in data_test['fichiers']]
+print("prédictions: {}".format(modele.predict(X_test).tolist()))
+print(" attendues : {}".format(Y_test))
