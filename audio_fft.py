@@ -6,13 +6,13 @@ import json, os, re
 N=128*2
 T=1.0/10000.0
 data: dict = {"N":N, "fichiers":[]}
-def wav_coefs(nom_fichier: str, type:str="inconnu"):
+def wav_coefs(nom_fichier: str, classe:str= "inconnu"):
     fe, audio = read(nom_fichier)#on lit chaque fichier audio
     coefs = np.abs(fft(audio, N)[0:N//2]) #partie réelle positive
     sortie = {
         "nom": nom_fichier,
         "coefs":coefs.tolist(),
-        "type":type
+        "classe":classe
     }
     return sortie
 
@@ -41,7 +41,7 @@ for dos in os.listdir('bonjour p2i'):
         for fichier in os.listdir("bonjour p2i/"+dos):
             if wav_file.match(fichier):
                 print(dos+"/"+fichier)
-                donnees = wav_coefs(nom_fichier="bonjour p2i/{}/{}".format(dos, fichier), type=dos)
+                donnees = wav_coefs(nom_fichier="bonjour p2i/{}/{}".format(dos, fichier), classe=dos)
                 data['fichiers'].append(donnees)
     except NotADirectoryError:
         pass

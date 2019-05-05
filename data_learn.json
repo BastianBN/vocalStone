@@ -133,7 +133,7 @@
                 87.22658260478322
             ],
             "nom": "1.wav",
-            "type": "jean"
+            "classe": "jean"
         },
         {
             "coefs": [
@@ -267,7 +267,7 @@
                 94.70132661536519
             ],
             "nom": "2.wav",
-          "type": "jean"
+          "classe": "jean"
         },
         {
             "coefs": [
@@ -401,7 +401,7 @@
                 41.49566685969257
             ],
             "nom": "3.wav",
-          "type": "jean"
+          "classe": "jean"
         },
         {
             "coefs": [
@@ -535,7 +535,7 @@
                 105.96279118315982
             ],
             "nom": "5.wav",
-          "type": "jean"
+          "classe": "jean"
         },
         {
             "coefs": [
@@ -669,7 +669,7 @@
                 4665.272509049449
             ],
             "nom": "6.wav",
-          "type": "musique"
+          "classe": "musique"
         },
         {
             "coefs": [
@@ -803,7 +803,7 @@
                 7881.819297432931
             ],
             "nom": "8.wav",
-          "type": "sinus"
+          "classe": "sinus"
         },
         {
             "coefs": [
@@ -937,7 +937,7 @@
                 35.62960647064538
             ],
             "nom": "bonjour p2i/bastian/1.wav",
-            "type": "bastian"
+            "classe": "bastian"
         },
         {
             "coefs": [
@@ -1071,7 +1071,7 @@
                 111.5042965610612
             ],
             "nom": "bonjour p2i/bastian/2.wav",
-            "type": "bastian"
+            "classe": "bastian"
         },
         {
             "coefs": [
@@ -1205,7 +1205,7 @@
                 77.44438816684648
             ],
             "nom": "bonjour p2i/bastian/5.wav",
-            "type": "bastian"
+            "classe": "bastian"
         },
         {
             "coefs": [
@@ -1339,7 +1339,7 @@
                 31.886358857089462
             ],
             "nom": "bonjour p2i/bastian/3.wav",
-            "type": "bastian"
+            "classe": "bastian"
         }
     ]
 }

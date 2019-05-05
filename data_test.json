@@ -133,7 +133,7 @@
                 118.27084584239398
             ],
             "nom": "4.wav",
-          "type": "jean"
+          "classe": "jean"
         },
         {
             "coefs": [
@@ -267,7 +267,7 @@
                 105.96279118315982
             ],
             "nom": "5.wav",
-          "type": "jean"
+          "classe": "jean"
         },
         {
             "coefs": [
@@ -401,7 +401,7 @@
                 4665.272509049449
             ],
             "nom": "6.wav",
-          "type": "musique"
+          "classe": "musique"
         },
         {
             "coefs": [
@@ -535,7 +535,7 @@
                 25737.46026628603
             ],
             "nom": "7.wav",
-          "type": "sinus"
+          "classe": "sinus"
         },
         {
             "coefs": [
@@ -669,7 +669,7 @@
                 7881.819297432931
             ],
             "nom": "8.wav",
-          "type": "sinus"
+          "classe": "sinus"
         },
         {
             "coefs": [
@@ -803,7 +803,7 @@
                 31.886358857089462
             ],
             "nom": "bonjour p2i/bastian/3.wav",
-            "type": "bastian"
+            "classe": "bastian"
         },
         {
             "coefs": [
@@ -937,7 +937,7 @@
                 74.65485971983745
             ],
             "nom": "bonjour p2i/bastian/4.wav",
-            "type": "bastian"
+            "classe": "bastian"
         }
     ]
 }
