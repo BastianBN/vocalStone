@@ -19,29 +19,12 @@ class Echantillon(Model):
     class Meta:
         database = bdd
     personne = ForeignKeyField(Personne, backref='echantillons')
-    _liste_coefs = CharField(max_length=4095,column_name='liste_coefs') #liste des coefficients de fourier séparés par des virgules
 
-    @property
-    def liste_coefs(self):
-        return self._liste_coefs #c'est comme ça qu'on fait les getters en python
-
-    @liste_coefs.setter
-    def liste_coefs(self, liste_coefs):
-        self._liste_coefs = liste_coefs
-        self.save()
-        i=1
-        Coef.delete().where(Coef.echantillon == self).execute()
-        for x in liste_coefs.split(','):
-            Coef.create(echantillon=self, coef_id=i, valeur=x)
-            i+=1
-
-class Coef(Model):
+class Morceau(Model):
     class Meta:
         database = bdd
-    echantillon = ForeignKeyField(Echantillon, backref='coefs')
-    valeur = DecimalField()
-    coef_id = IntegerField()
-
+    echantillon = ForeignKeyField(Echantillon, backref='morceaux')
+    coefs = CharField(max_length=4096)
 
 #bdd.create_tables([Personne, Echantillon, Coef])
 jean = Personne.select().where(Personne.nom == "Jean").get() #jean = Personne.create(nom="Jean")
