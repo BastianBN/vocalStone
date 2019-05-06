@@ -1,21 +1,21 @@
-import itertools
-import operator
 import os
-
-from python_speech_features import mfcc
 from scipy.io.wavfile import *
 from scipy.fftpack import fft
 import numpy as np
 from matplotlib import pyplot as plt
-import json
 import re
-import json
-
 from python_speech_features import mfcc
 from sklearn import tree, metrics
-
-from scipy.signal import hanning
 from scipy.signal.windows import hamming
+N=128*2
+def wav_coefs_morceaux(nom_fichier: str):
+    fe, audio = read(nom_fichier)#on lit chaque fichier audio
+    morceaux = np.array_split(audio, 100) #on coupe en 100 morceaux de taille a peu prs egale
+    coefs = []
+    for morceau in morceaux:
+        window = hamming(len(morceau))
+        coefs.append(np.abs(fft(morceau*window, N)[0:N//2])) #partie réelle positive
+    return coefs
 
 modele = tree.DecisionTreeClassifier()
 Xlearn,Ylearn = [],[] #listes d'entrainement pour le machine learning
@@ -26,9 +26,8 @@ for dos in os.listdir('echantillons-learn'):
         for fichier in os.listdir("echantillons-learn/"+dos):
             if wav_file.match(fichier):
                 print(dos+"/"+fichier)
-                fe, signal = read("echantillons-learn/{}/{}".format(dos, fichier))
-                coefs_mel: np.array = mfcc(signal, fe, nfft=1103)
-                for coefs in np.abs(coefs_mel):
+                coefs_fft = wav_coefs_morceaux("echantillons-learn/{}/{}".format(dos, fichier))
+                for coefs in np.abs(coefs_fft):
                     Xlearn.append(coefs)
                     Ylearn.append(dirN)
                 labels.append(dos)
@@ -46,9 +45,8 @@ for dos in os.listdir('echantillons-test'):
             if wav_file.match(fichier):
                 print(dos+"/"+fichier+" : "+str(dirN))
                 Xtest, Ytest = [], []
-                fe, signal = read("echantillons-test/{}/{}".format(dos, fichier))
-                coefs_mel: np.array = mfcc(signal, fe, nfft=1103)
-                for coefs in np.abs(coefs_mel):
+                coefs_fft = wav_coefs_morceaux("echantillons-test/{}/{}".format(dos, fichier))
+                for coefs in np.abs(coefs_fft):
                     Xtest.append(coefs)
                     Ytest.append(dirN)
 
