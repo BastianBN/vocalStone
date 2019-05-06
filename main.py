@@ -17,6 +17,7 @@ if os.name == 'posix':
 else:
     serial_port = Serial(port="COM3", baudrate=115200, timeout=1, writeTimeout=1)
 t1=time.time()
+ml = DetecteurDeVoix()
 with serial_port as port_serie:
     if port_serie.isOpen():
         coefs_ffts = [] #plusieurs transformées de Fourier
@@ -29,7 +30,7 @@ with serial_port as port_serie:
                     if ligne != b'end': morceau_fft.append(ligne)
                 coefs_ffts.append(morceau_fft)
                 if len(coefs_ffts)>10: #on attend d'avoir quelques échantillons pour éviter de valier un seul faux positif
-                    classe_pred = predire_classe(modele, coefs_ffts)
+                    classe_pred = ml.predire_classe(coefs_ffts)
                     if classe_pred in classes_valides:
                         print("Personne autorisée à entrer !")
                         coefs_ffts = [] #on reset

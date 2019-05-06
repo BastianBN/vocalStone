@@ -15,12 +15,12 @@ N=128*2
 #labels = []  #liste des répertoires
 #
 #
-def wav_coefs_morceaux(nom_fichier: str, N:int=128, T:int=0.1) -> List[List]:
+def wav_coefs_morceaux(nom_fichier: str, N:int=128, T:int=0.01) -> List[List]:
     """
     Fonction pour faire la transformée de Fourier depuis un fichier
     :param nom_fichier: fichier .wav à lire
     :param N: nombre de coefficients de Fourier réels positifs voulus
-    :param T: fenêtre temporelle pour la FFT (100ms par défaut)
+    :param T: fenêtre temporelle pour la FFT (10ms par défaut)
     :return: T*(sample rate) listes de N coefficients (matrice 2D)
     """
     fe, audio = read(nom_fichier)#on lit chaque fichier audio
@@ -251,5 +251,6 @@ class TestP2I(DetecteurDeVoix): #classe héritée pour les tests
 
 p2i = TestP2I()
 p2i.test_confusion()
+print(p2i.labels_dict)
 p2i.confusion_globale()
 print(p2i.predire_classe_texte(wav_coefs_morceaux("bonjour p2i/jean/1.wav", 128*2)))
