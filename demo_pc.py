@@ -10,6 +10,7 @@ from matplotlib import pyplot as plt
 import re
 from sklearn import tree, metrics
 from scipy.signal.windows import hamming
+from bdd import *
 N=128*2
 #wav_file = re.compile('^.+wav$')
 #labels = []  #liste des répertoires
@@ -109,7 +110,7 @@ def wav_coefs_morceaux(nom_fichier: str, N:int=128, T:int=0.01) -> List[List]:
 #plt.matshow(mc)
 #plt.show()
 
-class DetecteurDeVoix():
+class BaseDetecteur():
     """
     Classe qui inclut tout le nécessaire pour analyser des coefficients de Fourier en machine learning
     """
@@ -120,6 +121,7 @@ class DetecteurDeVoix():
     matrice_confusion: np.ndarray
     t1:float
     modele: tree.DecisionTreeClassifier
+    Xlearn, Ylearn = [], []  # listes d'entrainement pour le machine learning
     def __init__(self,
                  fichier_modele=None,
                  modele=None,
@@ -159,7 +161,6 @@ class DetecteurDeVoix():
     def entrainer_modele(self):
         print("Entraînement de l'arbre de désicion")
         dirN = 0
-        Xlearn, Ylearn = [], []  # listes d'entrainement pour le machine learning
         for dos in os.listdir(self.dossier_apprentissage):
             try:
                 for fichier in os.listdir(self.dossier_apprentissage +"/"+ dos):
@@ -167,13 +168,13 @@ class DetecteurDeVoix():
                         print(dos + "/" + fichier)
                         coefs_fft = wav_coefs_morceaux("{}/{}/{}".format(self.dossier_apprentissage, dos, fichier), N)
                         for coefs in np.abs(coefs_fft):
-                            Xlearn.append(coefs)
-                            Ylearn.append(dirN)
+                            self.Xlearn.append(coefs)
+                            self.Ylearn.append(dirN)
                 self.labels.append(dos)
                 dirN += 1
             except NotADirectoryError:
                 pass
-        self.modele.fit(Xlearn, Ylearn)
+        self.modele.fit(self.Xlearn, self.Ylearn)
 
     def predire_classe(self, coefs_fft, dirN=None, verbose=False) -> int:
         Xtest, Ytest = [], []
@@ -209,7 +210,7 @@ class DetecteurDeVoix():
         classe = self.predire_classe(coefs_fft, dirN, verbose)
         print(classe)
         return self.labels[classe]
-class TestP2I(DetecteurDeVoix): #classe héritée pour les tests
+class TestP2I(BaseDetecteur): #classe héritée pour les tests
     gCYtest, gCYpred = [], [] # matrice de confusion sur toutes les transformées de Fourier
     def tester_modele(self):
         coefs_fft=None
@@ -249,8 +250,65 @@ class TestP2I(DetecteurDeVoix): #classe héritée pour les tests
         print(mc)
         plt.show()
 
-p2i = TestP2I()
-p2i.test_confusion()
-print(p2i.labels_dict)
-p2i.confusion_globale()
-print(p2i.predire_classe_texte(wav_coefs_morceaux("bonjour p2i/jean/1.wav", 128*2)))
+
+class DetecteurDevVoix(BaseDetecteur):
+    #bdd:Database = None
+    #def __init__(self, fichier_modele=None, modele=None,
+    #             dossier_apprentissage="echantillons-learn", dossier_test="echantillons-test", N=128, T=0.1,
+    #             bdd=MySQLDatabase('G223_B_BD2', user='G223_B', password='G223_B', host='pc-tp-mysql.insa-lyon.fr', port=3306)
+    #             ):
+    #    self.bdd = bdd
+    #    super(BaseDetecteur).__init__(fichier_modele, modele, dossier_apprentissage, dossier_test, N, T)
+
+    def entrainer_modele(self):
+        """
+        Surcharge la méthode idoine pour charger les échantillons depuis la base de données plutôt que depuis des fichiers
+        """
+        print("Entraînement de l'arbre de décision depuis la base de données")
+        dirN = 0
+        for personne in Personne.select():
+            print(personne.nom)
+            for echantillon in personne.echantillons:
+                print(echantillon.nom_echantillon)
+                for morceau in echantillon.morceaux:
+                    self.Xlearn.append(morceau.coefs)
+                    self.Ylearn.append(echantillon.nom_echantillon)
+            self.labels.append(personne.nom)
+        self.modele.fit(self.Xlearn, self.Ylearn)
+
+    def ajouter_echantillon_bdd(self, coefs_fft, nom_classe, nom_echantillon):
+        #try:
+        #    personne = Personne.select().where(Personne.nom == nom_classe)
+        #except bdd.PersonneDoesNotExist:
+        #    personne = Personne.create(nom=nom_classe)
+        #try:
+        #    echantillon = Echantillon.get((Echantillon.nom_echantillon == nom_echantillon) & (Echantillon.personne == personne))
+        #except bdd.EchantillonDoesNotExist:
+        #    echantillon = Echantillon.create(nom_echantillon=nom_echantillon, personne=personne)
+        personne, nouveau = Personne.get_or_create(nom=nom_classe)
+        echantillon, estilnouveau = Echantillon.get_or_create(nom_echantillon=nom_echantillon, personne=personne)
+        for coefs in coefs_fft:
+            m = Morceau(echantillon=echantillon)
+            m.coefs = coefs #pour que la conversion interne du tableau en string soit bien faite
+            m.save()
+
+    def remplir_bdd(self):
+        print("Remplissage de la BDD avec des échantillons depuis le dossier "+self.dossier_apprentissage)
+        dirN = 0
+        Xlearn, Ylearn = [], []  # listes d'entrainement pour le machine learning
+        for dos in os.listdir(self.dossier_apprentissage):
+            try:
+                for fichier in os.listdir(self.dossier_apprentissage + "/" + dos):
+                    if self.wav_file.match(fichier):
+                        print(dos + "/" + fichier)
+                        coefs_fft = wav_coefs_morceaux("{}/{}/{}".format(self.dossier_apprentissage, dos, fichier), N)
+                        self.ajouter_echantillon_bdd(coefs_fft, nom_classe=dos, nom_echantillon=fichier)
+                self.labels.append(dos)
+                dirN += 1
+            except NotADirectoryError:
+                pass
+#p2i = TestP2I()
+#p2i.test_confusion()
+#print(p2i.labels_dict)
+#p2i.confusion_globale()
+#print(p2i.predire_classe_texte(wav_coefs_morceaux("bonjour p2i/jean/1.wav", 128*2)))
