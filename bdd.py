@@ -1,16 +1,17 @@
 from decimal import Decimal
+from io import BytesIO
 
 import numpy
 from peewee import *
 from peewee import RawQuery
 
-#bdd = MySQLDatabase('G223_B_BD2', user='G223_B', password='G223_B',host='pc-tp-mysql.insa-lyon.fr', port=3306)
-bdd = PostgresqlDatabase('p2i', user='p2i', password='wheatstone', host='vps.ribes.ovh', port=5432)
-bdd.connect()
+maBDD = MySQLDatabase('G223_B_BD2', user='G223_B', password='G223_B', host='pc-tp-mysql.insa-lyon.fr', port=3306)
+#bdd = PostgresqlDatabase('p2i', user='p2i', password='wheatstone', host='vps.ribes.ovh', port=5432)
+maBDD.connect()
 
 class Personne(Model):
     class Meta:
-        database = bdd
+        database = maBDD
     nom = CharField(max_length=255, unique=True)
 
 class Echantillon(Model):
@@ -19,29 +20,31 @@ class Echantillon(Model):
     utiliser ``_liste_coefs`` pour faire les requêtes et ``liste_coefs``pour les opéeations Python
     """
     class Meta:
-        database = bdd
+        database = maBDD
     personne = ForeignKeyField(Personne, backref='echantillons')
     nom_echantillon = CharField(max_length=255)
 
 class Morceau(Model):
     class Meta:
-        database = bdd
+        database = maBDD
     #def __init__(self, echantiloon, _coefs, **kwargs):
     #def __init__(self, **kwargs):
     #    self.coefs = kwargs.get('coefs', None)
     #    super().__init__(**kwargs)
     echantillon = ForeignKeyField(Echantillon, backref='morceaux')
-    _coefs = TextField()
+    _coefs = BlobField()
 
     @property
     def coefs(self):
-        return numpy.fromstring(self._coefs, dtype=int, sep=',')
+        return numpy.load(BytesIO(self._coefs))
 
     @coefs.setter
     def coefs(self, coefs: numpy.array):
-        self._coefs = str(coefs.tolist()).rstrip("']").lstrip("['").replace(' ', '')
+        with BytesIO() as b:
+            numpy.save(b, coefs)
+            self._coefs = b.getvalue()
 
-#bdd.create_tables([Personne, Echantillon, Coef])
+#bdd.create_tables([Personne, Echantillon, Morceau])
 #jean = Personne.select().where(Personne.nom == "Jean").get() #jean = Personne.create(nom="Jean")
 #jean_ech1 = Echantillon.create(
 #    personne=jean,
