@@ -4,36 +4,47 @@
 # Timeout en lecture : 1 sec
 # Timeout en écriture : 1 sec
 import time
-
 from serial import Serial
-from demo_pc import *
-import os
-f=open("decisiontree.pickle")
-modele = pickle.load(f)
-f.close()
-classes_valides = [0, 1] #les numéros des dossiers avec le nom des personnes à reconnaître 0=bastian, 1=jean
-if os.name == 'posix':
+from classificateur import *
+import platform
+
+#f=open("decisiontree.pickle")
+#modele = pickle.load(f)
+#f.close()
+classes_valides = ['bastian', 'jean'] #les numéros des dossiers avec le nom des personnes à reconnaître 0=bastian, 1=jean
+if platform.system() == 'Linux': #Linux
     serial_port = Serial(port="/dev/ttyACM0", baudrate=115200, timeout=1, writeTimeout=1)
-else:
+elif platform.system() == 'Darwin': #macOS
+    serial_port = Serial(port='/dev/cu.usbmodem1A161', baudrate=115200, timeout=1, writeTimeout=1)
+else: #Windows
     serial_port = Serial(port="COM3", baudrate=115200, timeout=1, writeTimeout=1)
 t1=time.time()
 ml = DetecteurDeVoix()
 with serial_port as port_serie:
+    morceau_fft=None
     if port_serie.isOpen():
         coefs_ffts = [] #plusieurs transformées de Fourier
         while True:
             ligne = port_serie.readline().replace(b'\r\n', b'')
-            morceau_fft = [] #une transformée de Fourier
             if ligne == b"begin":
-                while ligne != b'end':
-                    ligne = port_serie.readline().replace(b'\r\n', b'')
-                    if ligne != b'end': morceau_fft.append(ligne)
-                coefs_ffts.append(morceau_fft)
-                if len(coefs_ffts)>10: #on attend d'avoir quelques échantillons pour éviter de valier un seul faux positif
-                    classe_pred = ml.predire_classe(coefs_ffts)
+                morceau_fft = []  # une transformée de Fourier
+                continue
+            if ligne != b'end' and ligne != b'begin' and ligne !=b'\n' and ligne != b'' and morceau_fft is not None:
+                #print(ligne)
+                nombre = float(ligne.decode('utf-8'))
+                if ligne != 'end':
+                    morceau_fft.append(nombre)
+            if ligne == b'end' and morceau_fft is not None:
+                coefs_ffts.append(np.array(morceau_fft))
+                if len(coefs_ffts)>20: #on attend d'avoir quelques échantillons pour éviter de valier un seul faux positif
+                    donnees = np.array(coefs_ffts)
+                    classe_pred = ml.predire_classe_texte(donnees)
+                    print(classe_pred)
                     if classe_pred in classes_valides:
                         print("Personne autorisée à entrer !")
-                        coefs_ffts = [] #on reset
+                    coefs_ffts = [] #on reset
+                morceau_fft = None  # pour bien faire sortir les erreurs
             if time.time()-t1 > 60:
+                print("temps écoulé, on reset l'écoute")
                 t1=time.time()
                 coefs_ffts=[] #on reset aussi toutes les minutes

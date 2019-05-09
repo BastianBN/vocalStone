@@ -11,12 +11,13 @@ import re
 from sklearn import tree, metrics
 from scipy.signal.windows import hamming
 from bdd import *
-N=128*2
+N=64*2 #nombre de coefficients par échantillon, il faut multiplier par 2 à cause de la moitié négative
+
 #wav_file = re.compile('^.+wav$')
 #labels = []  #liste des répertoires
 #
 #
-def wav_coefs_morceaux(nom_fichier: str, N:int=128, T:int=0.01) -> List[List]:
+def wav_coefs_morceaux(nom_fichier: str, N:int=N, T:int=0.01) -> List[List]:
     """
     Fonction pour faire la transformée de Fourier depuis un fichier
     :param nom_fichier: fichier .wav à lire
@@ -29,7 +30,7 @@ def wav_coefs_morceaux(nom_fichier: str, N:int=128, T:int=0.01) -> List[List]:
     coefs = []
     for morceau in morceaux:
         window = hamming(len(morceau))
-        coefs.append(np.abs(fft(morceau*window, N*2)[0:N])) #partie réelle positive
+        coefs.append(np.abs(fft(morceau*window, N)[0:N//2])) #partie réelle positive
     return coefs
 #
 #
@@ -127,7 +128,7 @@ class BaseDetecteur():
                  modele=None,
                  dossier_apprentissage="echantillons-learn",
                  dossier_test="echantillons-test",
-                 N=128,
+                 N=N,
                  T=0.1):  #"constructeur"
 
         self.modele = modele
@@ -212,7 +213,7 @@ class BaseDetecteur():
         return self.labels[classe]
 
 
-class DetecteurDevVoix(BaseDetecteur):
+class DetecteurDeVoix(BaseDetecteur):
     #bdd:Database = None
     #def __init__(self, fichier_modele=None, modele=None,
     #             dossier_apprentissage="echantillons-learn", dossier_test="echantillons-test", N=128, T=0.1,
@@ -230,6 +231,7 @@ class DetecteurDevVoix(BaseDetecteur):
             for personne in Personne.select():
                 self.labels_dict[personne.id]=personne.nom
                 self.labels_reverse[personne.nom]=personne.id
+            print(self.labels_dict)
         except:
             print("aucune classe déterminée")
         super().__init__(**kwargs)
@@ -284,10 +286,10 @@ class DetecteurDevVoix(BaseDetecteur):
 
     def predire_classe_texte(self, coefs_fft, dirN=None, verbose=False)->str:
         classe = self.predire_classe(coefs_fft, dirN, verbose)
-        print(classe)
+        #print(classe)
         return self.labels_dict[classe]
 
-class TestP2I(DetecteurDevVoix): #classe héritée pour les tests
+class TestP2I(DetecteurDeVoix): #classe héritée pour les tests
     gCYtest, gCYpred = [], [] # matrice de confusion sur toutes les transformées de Fourier
     def tester_modele(self):
         coefs_fft=None

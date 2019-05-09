@@ -44,7 +44,7 @@ class Morceau(Model):
             numpy.save(b, coefs)
             self._coefs = b.getvalue()
 
-#bdd.create_tables([Personne, Echantillon, Morceau])
+#maBDD.create_tables([Personne, Echantillon, Morceau])
 #jean = Personne.select().where(Personne.nom == "Jean").get() #jean = Personne.create(nom="Jean")
 #jean_ech1 = Echantillon.create(
 #    personne=jean,
