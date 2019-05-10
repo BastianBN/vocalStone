@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-if [[ -e venv ]] && [[ -d venv ]]
+if [ -e venv ] && [ -d venv ]
 then
     echo "Pas besoin de créer un virtualenv"
     . venv/bin/activate

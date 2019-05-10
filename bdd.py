@@ -60,4 +60,6 @@ class Morceau(Model):
 #for row in RawQuery(sql="SELECT * FROM personne").bind(bdd).execute():
 #    personne = Personne(**row) #on transforme {'id':1, 'nom':'bastian'} en Personne(id=1, nom="bastian"), ça s'applelle l'unpacking
 #    print(personne.nom)
-#
+
+# requete pour voir les enregistrements
+#select p.nom, e.nom_echantillon, count(m.id) from personne as p, echantillon as e, morceau as m where m.echantillon_id = e.id and e.personne_id = p.id group by m.echantillon_id;
