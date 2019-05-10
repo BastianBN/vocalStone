@@ -12,6 +12,8 @@ from sklearn import tree, metrics
 from scipy.signal.windows import hamming
 from bdd import *
 from python_speech_features import mfcc
+
+freq_ech = 20000
 N=64*2 #nombre de coefficients par échantillon, il faut multiplier par 2 à cause de la moitié négative
 
 #wav_file = re.compile('^.+wav$')
@@ -181,7 +183,7 @@ class BaseDetecteur():
     def predire_classe(self, coefs_fft, dirN=None, verbose=False) -> int:
         Xtest, Ytest = [], []
         for coefs in np.abs(coefs_fft):
-            for cepstrum in mfcc(coefs, 10000):
+            for cepstrum in mfcc(coefs, freq_ech):
                 Xtest.append(cepstrum)
                 if dirN is not None:Ytest.append(dirN)
 
@@ -249,7 +251,7 @@ class DetecteurDeVoix(BaseDetecteur):
             for echantillon in personne.echantillons:
                 print(echantillon.nom_echantillon)
                 for morceau in echantillon.morceaux:
-                    for cepstrum in mfcc(morceau.coefs, 10000):
+                    for cepstrum in mfcc(morceau.coefs, freq_ech):
                         self.Xlearn.append(cepstrum)
                         self.Ylearn.append(personne.id)
             self.labels.append(personne.nom)

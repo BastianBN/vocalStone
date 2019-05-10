@@ -40,7 +40,7 @@ with serial_port as port_serie:
                 #print(ligne)
             try:
                 nombre = float(ligne.decode('utf-8'))
-                if ligne != 'end':
+                if ligne != 'end' and morceau_fft is not None:
                     morceau_fft.append(nombre)
             except (UnicodeDecodeError, ValueError):
                 pass
