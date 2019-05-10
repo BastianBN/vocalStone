@@ -63,3 +63,5 @@ class Morceau(Model):
 
 # requete pour voir les enregistrements
 #select p.nom, e.nom_echantillon, count(m.id) from personne as p, echantillon as e, morceau as m where m.echantillon_id = e.id and e.personne_id = p.id group by m.echantillon_id;
+
+# select p.nom, count(e.id) from personne as p, echantillon as e where e.personne_id = p.id group by p.id;

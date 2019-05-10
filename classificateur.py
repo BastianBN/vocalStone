@@ -11,13 +11,14 @@ import re
 from sklearn import tree, metrics
 from scipy.signal.windows import hamming
 from bdd import *
+from python_speech_features import mfcc
 N=64*2 #nombre de coefficients par échantillon, il faut multiplier par 2 à cause de la moitié négative
 
 #wav_file = re.compile('^.+wav$')
 #labels = []  #liste des répertoires
 #
 #
-def wav_coefs_morceaux(nom_fichier: str, N:int=N, T:int=0.01) -> List[List]:
+def wav_coefs_morceaux(nom_fichier: str, N:int=N, T:float=0.01) -> List[List]:
     """
     Fonction pour faire la transformée de Fourier depuis un fichier
     :param nom_fichier: fichier .wav à lire
@@ -180,8 +181,9 @@ class BaseDetecteur():
     def predire_classe(self, coefs_fft, dirN=None, verbose=False) -> int:
         Xtest, Ytest = [], []
         for coefs in np.abs(coefs_fft):
-            Xtest.append(coefs)
-            if dirN is not None:Ytest.append(dirN)
+            for cepstrum in mfcc(coefs, 10000):
+                Xtest.append(cepstrum)
+                if dirN is not None:Ytest.append(dirN)
 
         Ypred = self.modele.predict(Xtest)
         if verbose and dirN is not None:
@@ -247,8 +249,9 @@ class DetecteurDeVoix(BaseDetecteur):
             for echantillon in personne.echantillons:
                 print(echantillon.nom_echantillon)
                 for morceau in echantillon.morceaux:
-                    self.Xlearn.append(morceau.coefs)
-                    self.Ylearn.append(personne.id)
+                    for cepstrum in mfcc(morceau.coefs, 10000):
+                        self.Xlearn.append(cepstrum)
+                        self.Ylearn.append(personne.id)
             self.labels.append(personne.nom)
         self.modele.fit(self.Xlearn, self.Ylearn)
 

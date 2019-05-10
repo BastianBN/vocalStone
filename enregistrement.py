@@ -19,7 +19,7 @@ classes_valides = ['bastian', 'jean'] #les numéros des dossiers avec le nom des
 if platform.system() == 'Linux': #Linux
     serial_port = Serial(port="/dev/ttyACM0", baudrate=115200, timeout=1, writeTimeout=1)
 elif platform.system() == 'Darwin': #macOS
-    serial_port = Serial(port='/dev/cu.usbmodem1A161', baudrate=115200, timeout=1, writeTimeout=1)
+    serial_port = Serial(port='/dev/cu.usbmodem1A151', baudrate=115200, timeout=1, writeTimeout=1)
 else: #Windows
     serial_port = Serial(port="COM3", baudrate=115200, timeout=1, writeTimeout=1)
 
