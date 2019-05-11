@@ -1,7 +1,9 @@
+import json
 import threading
 import time
 import tkinter
-from tkinter import filedialog
+from tkinter import filedialog, simpledialog, ttk
+from tkinter.ttk import Progressbar
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
@@ -41,8 +43,10 @@ class P2IGUI(tkinter.Tk):
         self.file_menu = tkinter.Menu(self.menu_bar, tearoff=0)
         self.graph_menu = tkinter.Menu(self.menu_bar, tearoff=0)
         self.test_menu = tkinter.Menu(self.menu_bar, tearoff=0)
+
         # Add commands to submenu
         self.file_menu.add_command(label="Analyser un ficher audio WAV", command=self.choisir_fichier_et_analyser)
+        self.file_menu.add_command(label="Enregistrer un locuteur", command=self.enregistrer_echantillon)
         self.file_menu.add_command(label="Détecter un loctuer avec Arduino", command=self.reconnaitre_voix)
         self.file_menu.add_command(label="Arrêter la détection", command=self.stop_reconnaissance_vocale)
         self.file_menu.add_command(label="Quitter", command=self.destroy)
@@ -52,6 +56,9 @@ class P2IGUI(tkinter.Tk):
         self.test_menu.add_command(label="Courbe 3", command=self.courbe3)
         self.test_menu.add_command(label="Afficher Bastian", command=self.afficher_bastian)
         self.test_menu.add_command(label="Thread test", command=self.long_test)
+
+        self.graph_menu.add_command(label="Afficher le graph tampon", command=self.plot_data)
+        self.graph_menu.add_command(label="Effacer le graphique", command=self.reset_graph)
 
         self.serial_frame = tkinter.Frame(master=self)
         self.serial_frame.pack()  # Conteneur pour les infos liées à la détéction des voix
@@ -64,9 +71,7 @@ class P2IGUI(tkinter.Tk):
 
         self.setup_matplotlib_figure()
 
-#        self.graph_menu.add_command(label="Enregistrer le graphique", command=self.toolbar.save_figure)
-        self.graph_menu.add_command(label="Afficher le graph tampon", command=self.plot_data)
-        self.graph_menu.add_command(label="Effacer le graphique", command=self.reset_graph)
+
 
         # Add the "File" drop down sub-menu in the main menu bar
         self.menu_bar.add_cascade(label="Fichier", menu=self.file_menu)
@@ -208,7 +213,8 @@ class P2IGUI(tkinter.Tk):
                         coefs_ffts = []  # on reset
                     morceau_fft = None  # pour bien faire sortir les erreurs
 
-        ml = DetecteurDeVoix()
+        #ml = DetecteurDeVoix()
+        ml=None
         if serial_port.isOpen():
             t = threading.Thread(target=callback)
             self.reconnaissance_active=True
@@ -244,5 +250,82 @@ class P2IGUI(tkinter.Tk):
     def reset_graph_loop(self):
         self.fig.clear()
         self.after(1500, self.reset_graph_loop)
+
+    def enregistrer_echantillon(self):
+        coefs_ffts = []
+        fenetre_rec = tkinter.Toplevel()
+        fenetre_rec.title("Enregistrement d'un nouvel échantillon")
+        fenetre_rec.pack_propagate()
+
+        progessbar = Progressbar(master=fenetre_rec, mode='determinate')
+        #progessbar.pack()
+        nom_input = tkinter.Entry(master=fenetre_rec)
+        nom_input.pack()
+
+        def handle_save():
+            nom = nom_input.get()
+            print([x.nom for x in Personne.select().where(Personne.nom == nom)])
+            with open(nom + ".json", "w+") as f:  # enregistrement et fin du prgm
+                json.dump(coefs_ffts, f)
+            f.close()
+            personne, b = Personne.get_or_create(nom=nom)
+            lt = time.localtime()
+            maintenant = str(lt.tm_hour) + ":" + str(lt.tm_min)
+            echantillon = Echantillon.create(personne=personne, nom_echantillon=maintenant)
+            for tab in coefs_ffts:
+                morceau = Morceau(echantillon=echantillon)
+                morceau.coefs = numpy.array(tab)
+                morceau.save()
+            fenetre_rec.destroy()#fini !
+
+        bouton_save = tkinter.Button(master=fenetre_rec, text="Ajouter à la BDD", command=handle_save, state='disabled')
+        bouton_save.pack()
+        def handle_fin_rec():
+            progessbar.stop()
+            bouton_save.configure(state='normal')
+        def handle_rec():
+            bouton_rec.configure(state='disabled')
+            #progessbar.start()
+            morceau_fft = None
+            if serial_port.isOpen():
+                print("Début enregistrement")
+                while len(coefs_ffts) <= 40:
+                    ligne = serial_port.readline().replace(b'\r\n', b'')
+                    if ligne == b"begin":
+                        morceau_fft = []  # une transformée de Fourier
+                        #progessbar.step(len(coefs_ffts))
+                        continue
+                    if ligne != b'end' and ligne != b'begin' and ligne != b'\n' and ligne != b'' and morceau_fft is not None:
+                        nombre = float(ligne.decode('utf-8'))
+                        if ligne != 'end':
+                            morceau_fft.append(nombre)
+                    if ligne == b'end' and morceau_fft is not None:
+                        if len(morceau_fft) == 64:
+                            coefs_ffts.append(morceau_fft)
+                        else:
+                            morceau_fft = None
+                            continue
+
+            fenetre_rec.after(4000, handle_fin_rec)
+        bouton_rec = tkinter.Button(fenetre_rec, text="Démarrer l'enregistrement", command=handle_rec)
+        bouton_rec.pack()
+
+        echantillons_view = tkinter.Listbox(master=fenetre_rec, selectmode=tkinter.SINGLE)
+        def handle_select(ev):
+            nom_input.delete(0, tkinter.END)
+            #nom_input.insert(0, Personne.get(Personne.id==echantillons_view.curselection()[0]).nom) #c'est moche
+            nom_input.insert(0, echantillons_view.get(echantillons_view.curselection()[0]))
+            nom_input.setvar('text', echantillons_view.curselection())
+        echantillons_view.bind("<Double-Button-1>", handle_select)
+        #echantillons_view.bind("<Button-1>", handle_select)
+        echantillons_view.pack()
+        for p in Personne.select():
+            echantillons_view.insert(tkinter.END, p.nom)
+        #fenetre_rec.pack_slaves()
+        fenetre_rec.focus()
+        #nom = simpledialog.askstring(title="Enregistrement d'un nouvel échantillon", prompt="Nom du locuteur", parent=self)
+        #time.sleep(3)
+        fenetre_rec.pack_slaves()
+        progessbar.stop()
 
 g = P2IGUI()
