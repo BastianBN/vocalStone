@@ -21,13 +21,15 @@ def commande_test():
 if platform.system() == 'Linux':  # Linux
     serial_port = Serial(port="/dev/ttyACM0", baudrate=115200, timeout=1, writeTimeout=1)
 elif platform.system() == 'Darwin':  # macOS
-    serial_port = Serial(port='/dev/cu.usbmodem1A151', baudrate=115200, timeout=1, writeTimeout=1)
+    serial_port = Serial(port='/dev/cu.usbmodem1A161', baudrate=115200, timeout=1, writeTimeout=1)
 else:  # Windows
     serial_port = Serial(port="COM3", baudrate=115200, timeout=1, writeTimeout=1)
 
 class P2IGUI(tkinter.Tk):
     coefs_fft_mean: List = []
     fft_time_series = [[],[],[],[],[],[],[],[],[],[]]
+    morceau_fft=[]
+    reconnaissance_active=True
     def __init__(self, *args, **kwargs):
         tkinter.Tk.__init__(self, *args, **kwargs)
         self.title("Reconnaissance vocale GUI")
@@ -42,6 +44,7 @@ class P2IGUI(tkinter.Tk):
         # Add commands to submenu
         self.file_menu.add_command(label="Analyser un ficher audio WAV", command=self.choisir_fichier_et_analyser)
         self.file_menu.add_command(label="Détecter un loctuer avec Arduino", command=self.reconnaitre_voix)
+        self.file_menu.add_command(label="Arrêter la détection", command=self.stop_reconnaissance_vocale)
         self.file_menu.add_command(label="Quitter", command=self.destroy)
 
         self.test_menu.add_command(label="Exécuter commande_test", command=commande_test)
@@ -55,12 +58,13 @@ class P2IGUI(tkinter.Tk):
         self.graph_frame = tkinter.Frame(master=self)
         self.graph_frame.pack()  # conteneur pour les graphiques
 
-        self.nom = tkinter.Message(self.serial_frame, text="Jean Ribes", font=('times', 48))
+        self.nom = tkinter.Message(self.serial_frame, text="Lancez la reconnaisance vocale", font=('sans-serif', 30), width=400)
+        #family="sans-serif"
         self.nom.pack()
 
         self.setup_matplotlib_figure()
 
-        self.graph_menu.add_command(label="Enregistrer le graphique", command=self.toolbar.save_figure)
+#        self.graph_menu.add_command(label="Enregistrer le graphique", command=self.toolbar.save_figure)
         self.graph_menu.add_command(label="Afficher le graph tampon", command=self.plot_data)
         self.graph_menu.add_command(label="Effacer le graphique", command=self.reset_graph)
 
@@ -73,6 +77,9 @@ class P2IGUI(tkinter.Tk):
         self.mainloop()
 
     def courbe2(self):
+        x=np.linspace(1,10)
+        y=np.exp(x)
+        self.plot(x,y)
         pass
 
     def courbe3(self):
@@ -99,9 +106,9 @@ class P2IGUI(tkinter.Tk):
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)  # A tk.DrawingArea.
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
-        self.toolbar = NavigationToolbar2Tk(self.canvas, self.graph_frame)
+        #self.toolbar = NavigationToolbar2Tk(self.canvas, self.graph_frame)
         # self.toolbar.update()
-        self.canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
+        #self.canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
 
     def afficher_nom(self, nom: str):
         self.nom.configure(text=nom)
@@ -161,8 +168,7 @@ class P2IGUI(tkinter.Tk):
         def callback():
             morceau_fft=None
             coefs_ffts = []
-            index_sw=0
-            while True:
+            while self.reconnaissance_active:
                 ligne = serial_port.readline().replace(b'\r\n', b'')
                 if ligne == b'restart':
                     print("Remise à zéro des tableaux, parlez maintenant")
@@ -183,6 +189,7 @@ class P2IGUI(tkinter.Tk):
                 if ligne == b'end' and morceau_fft is not None:
                     if len(morceau_fft) == 64:
                         coefs_ffts.append(np.array(morceau_fft))
+                        self.morceau_fft = np.array(morceau_fft)
                         # self.plot_fft(morceau_fft)
                     else:
                         morceau_fft = None
@@ -196,22 +203,20 @@ class P2IGUI(tkinter.Tk):
                         # if classe_pred in classes_valides:
                         #    print("Personne autorisée à entrer !")
                         #    print(f.renderText(classe_pred))
-                        self.coefs_fft_mean = [np.mean(x) for x in self.donnees.transpose()]
-                        self.fft_time_series[index_sw]=self.coefs_fft_mean
-                        if index_sw>8:
-                            index_sw=0
-                        else:
-                            index_sw+=1
+
+                        #self.coefs_fft_mean = [np.mean(x) for x in self.donnees.transpose()]
                         coefs_ffts = []  # on reset
                     morceau_fft = None  # pour bien faire sortir les erreurs
 
         ml = DetecteurDeVoix()
         if serial_port.isOpen():
             t = threading.Thread(target=callback)
+            self.reconnaissance_active=True
             t.start()
             self.after(1000, self.afficher_fft_realtime)
-            #self.after(10000, self.reset_graph_loop)
-
+            self.after(2000, self.reset_graph_loop)
+    def stop_reconnaissance_vocale(self):
+        self.reconnaissance_active=False
     #def OLDafficher_fft_realtime(self):
     #    if len(self.donnees)>0:
     #        self.plot_fft(self.coefs_fft_mean)
@@ -219,14 +224,25 @@ class P2IGUI(tkinter.Tk):
 
     def afficher_fft_realtime(self):
         if len(self.fft_time_series)>0:
-            self.fig.clear()
-            for ffts in self.fft_time_series:
-                self.plot_fft(self.coefs_fft_mean)
-            self.after(500, self.afficher_fft_realtime)
+            #self.fig.clear()
+
+            #self.coefs_fft_mean[63]=100
+            #self.plot_fft(self.coefs_fft_mean)
+            #to_display=[]
+            #for ffts in np.array(self.fft_time_series).transpose():
+            #    to_display.append(np.mean(ffts))
+            #to_display = [np.mean(ffts) for ffts in np.array(self.fft_time_series).transpose()]
+            #to_display[63]=100
+            #self.plot_fft(to_display)
+
+            self.morceau_fft[63]=100
+            self.plot_fft(self.morceau_fft)
+
+            self.after(100, self.afficher_fft_realtime)
 
 
     def reset_graph_loop(self):
         self.fig.clear()
-        self.after(10000, self.reset_graph_loop)
+        self.after(1500, self.reset_graph_loop)
 
 g = P2IGUI()
