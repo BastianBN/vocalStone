@@ -4,28 +4,18 @@ import time
 import tkinter
 from tkinter import filedialog, simpledialog, ttk
 from tkinter.ttk import Progressbar
-
+from bdd import *
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
 import numpy as np
 
-from classificateur import wav_coefs_morceaux
-import time
 from serial import Serial
 from classificateur import *
 import platform
-from pyfiglet import Figlet
 
 def commande_test():
     print("test")
 
-
-if platform.system() == 'Linux':  # Linux
-    serial_port = Serial(port="/dev/ttyACM0", baudrate=115200, timeout=1, writeTimeout=1)
-elif platform.system() == 'Darwin':  # macOS
-    serial_port = Serial(port='/dev/cu.usbmodem1A161', baudrate=115200, timeout=1, writeTimeout=1)
-else:  # Windows
-    serial_port = Serial(port="COM3", baudrate=115200, timeout=1, writeTimeout=1)
 
 class P2IGUI(tkinter.Tk):
     coefs_fft_mean: List = []
@@ -41,15 +31,23 @@ class P2IGUI(tkinter.Tk):
         self.menu_bar = tkinter.Menu(self)
         # Create the submenu (tearoff is if menu can pop out)
         self.file_menu = tkinter.Menu(self.menu_bar, tearoff=0)
+        self.detection_menu = tkinter.Menu(self.menu_bar, tearoff=0)
         self.graph_menu = tkinter.Menu(self.menu_bar, tearoff=0)
         self.test_menu = tkinter.Menu(self.menu_bar, tearoff=0)
+        self.bdd_menu = tkinter.Menu(self.menu_bar, tearoff=0)
 
+        self.menu_bar.add_cascade(label="Fichier", menu=self.file_menu)
+        self.menu_bar.add_cascade(label="Détection", menu=self.detection_menu)
+        self.menu_bar.add_cascade(label="Test", menu=self.test_menu)
+        self.menu_bar.add_cascade(label="Graphique", menu=self.graph_menu)
+        self.menu_bar.add_cascade(label="Base de données", menu=self.bdd_menu)
+        self.config(menu=self.menu_bar)
         # Add commands to submenu
         self.file_menu.add_command(label="Analyser un ficher audio WAV", command=self.choisir_fichier_et_analyser)
-        self.file_menu.add_command(label="Enregistrer un locuteur", command=self.enregistrer_echantillon)
-        self.file_menu.add_command(label="Détecter un loctuer avec Arduino", command=self.reconnaitre_voix)
-        self.file_menu.add_command(label="Arrêter la détection", command=self.stop_reconnaissance_vocale)
         self.file_menu.add_command(label="Quitter", command=self.destroy)
+
+        self.detection_menu.add_command(label="Détecter un loctuer avec Arduino", command=self.reconnaitre_voix)
+        self.detection_menu.add_command(label="Arrêter la détection", command=self.stop_reconnaissance_vocale)
 
         self.test_menu.add_command(label="Exécuter commande_test", command=commande_test)
         self.test_menu.add_command(label="Courbe 2", command=self.courbe2)
@@ -60,25 +58,25 @@ class P2IGUI(tkinter.Tk):
         self.graph_menu.add_command(label="Afficher le graph tampon", command=self.plot_data)
         self.graph_menu.add_command(label="Effacer le graphique", command=self.reset_graph)
 
+        self.bdd_menu.add_command(label="Gérer", command=self.gerer_bdd)
+        self.bdd_menu.add_command(label="Enregistrer un locuteur", command=self.enregistrer_echantillon)
+        self.bdd_menu.add_cascade(label="Récapitulatif", command=self.recap_bdd)
+
         self.serial_frame = tkinter.Frame(master=self)
-        self.serial_frame.pack()  # Conteneur pour les infos liées à la détéction des voix
+        self.serial_frame.pack(fill=tkinter.BOTH)  # Conteneur pour les infos liées à la détéction des voix
         self.graph_frame = tkinter.Frame(master=self)
         self.graph_frame.pack()  # conteneur pour les graphiques
 
-        self.nom = tkinter.Message(self.serial_frame, text="Lancez la reconnaisance vocale", font=('sans-serif', 30), width=400)
-        #family="sans-serif"
-        self.nom.pack()
+        self.nom = tkinter.Message(self.serial_frame, text="Lancez la reconnaisance vocale", font=('sans-serif', 30), width=400) #family="sans-serif"
+        self.nom.pack(side=tkinter.TOP, fill=tkinter.BOTH)
+        tkinter.Button(master=self.serial_frame, text="Enregistrer un nouvel échantillon", command=self.enregistrer_echantillon).pack(side=tkinter.LEFT)
+        tkinter.Button(master=self.serial_frame, text="Modifier la base de données", command=self.gerer_bdd).pack(side=tkinter.LEFT)
+        tkinter.Button(master=self.serial_frame, text="Lancer la reconnaissance vocale", command=self.reconnaitre_voix).pack(side=tkinter.LEFT)
 
         self.setup_matplotlib_figure()
 
-
-
-        # Add the "File" drop down sub-menu in the main menu bar
-        self.menu_bar.add_cascade(label="Fichier", menu=self.file_menu)
-        self.menu_bar.add_cascade(label="Test", menu=self.test_menu)
-        self.menu_bar.add_cascade(label="Graphique", menu=self.graph_menu)
         self.config(menu=self.menu_bar)
-
+        self.setup_serial()
         self.mainloop()
 
     def courbe2(self):
@@ -174,7 +172,7 @@ class P2IGUI(tkinter.Tk):
             morceau_fft=None
             coefs_ffts = []
             while self.reconnaissance_active:
-                ligne = serial_port.readline().replace(b'\r\n', b'')
+                ligne = self.serial_port.readline().replace(b'\r\n', b'')
                 if ligne == b'restart':
                     print("Remise à zéro des tableaux, parlez maintenant")
                     coefs_ffts = []
@@ -213,9 +211,8 @@ class P2IGUI(tkinter.Tk):
                         coefs_ffts = []  # on reset
                     morceau_fft = None  # pour bien faire sortir les erreurs
 
-        #ml = DetecteurDeVoix()
-        ml=None
-        if serial_port.isOpen():
+        ml = DetecteurDeVoix()
+        if self.serial_port.isOpen():
             t = threading.Thread(target=callback)
             self.reconnaissance_active=True
             t.start()
@@ -287,10 +284,10 @@ class P2IGUI(tkinter.Tk):
             bouton_rec.configure(state='disabled')
             #progessbar.start()
             morceau_fft = None
-            if serial_port.isOpen():
+            if self.serial_port.isOpen():
                 print("Début enregistrement")
                 while len(coefs_ffts) <= 40:
-                    ligne = serial_port.readline().replace(b'\r\n', b'')
+                    ligne = self.serial_port.readline().replace(b'\r\n', b'')
                     if ligne == b"begin":
                         morceau_fft = []  # une transformée de Fourier
                         #progessbar.step(len(coefs_ffts))
@@ -328,4 +325,79 @@ class P2IGUI(tkinter.Tk):
         fenetre_rec.pack_slaves()
         progessbar.stop()
 
+    def setup_serial(self):
+        if platform.system() == 'Linux':  # Linux
+            self.serial_port = Serial(port="/dev/ttyACM0", baudrate=115200, timeout=1, writeTimeout=1)
+        elif platform.system() == 'Darwin':  # macOS
+            self.serial_port = Serial(port='/dev/cu.usbmodem1A161', baudrate=115200, timeout=1, writeTimeout=1)
+        else:  # Windows
+            self.serial_port = Serial(port="COM3", baudrate=115200, timeout=1, writeTimeout=1)
+
+    def gerer_bdd(self):
+        fenetre = tkinter.Toplevel()
+        self.var_id_personne = tkinter.IntVar()
+        fr = tkinter.LabelFrame(master=fenetre, text="Sélectionnez un locuteur")
+        fr.pack(fill=tkinter.BOTH)
+        for personne in Personne.select():
+            r = tkinter.Radiobutton(master=fr, variable=self.var_id_personne, text=personne.nom, value=personne.id)
+            r.pack(side='left', expand=1)
+        def suppr_pers():
+            personne = Personne.get(Personne.id==self.var_id_personne.get())
+            for e in personne.echantillons:
+                e.delete_instance(recursive=True)
+            personne.delete_instance()
+            fenetre.destroy()
+            self.gerer_bdd()
+        bouton_suppr = tkinter.Button(master=fenetre, text="Supprimer", command=suppr_pers)
+        bouton_suppr.pack(side=tkinter.LEFT)
+        bouton_ech = tkinter.Button(master=fenetre, text="Échantillons >>", command=self.gerer_echantillons)
+        bouton_ech.pack(side=tkinter.RIGHT)
+        fenetre.pack_slaves()
+        fenetre.focus()
+
+    def gerer_echantillons(self):
+        fenetre = tkinter.Toplevel()
+        var_id_echantillon = tkinter.IntVar()
+        fr = tkinter.LabelFrame(master=fenetre, text="Sélectionnez un échantillon")
+        fr.pack(fill=tkinter.BOTH)
+        for echantilon in Personne.get(Personne.id==self.var_id_personne.get()).echantillons:
+            r = tkinter.Radiobutton(master=fr, variable=var_id_echantillon, value=echantilon.id, text=echantilon.nom_echantillon)
+            r.pack(side=tkinter.LEFT)
+
+        def suppr_ech():
+            e=Echantillon.get(Echantillon.id==var_id_echantillon.get())
+            e.delete_instance(recursive=True)
+        bouton_suppr = tkinter.Button(master=fenetre, text="Supprimer", command=suppr_ech)
+        bouton_suppr.pack(side=tkinter.RIGHT)
+
+        nom_ech = tkinter.Entry(master=fenetre, text="Nom")
+        def enregistrer_ech():
+            #print(nom_ech.get())
+            e:Echantillon = Echantillon.get(Echantillon.id==var_id_echantillon.get())
+            e.nom_echantillon=nom_ech.get()
+            e.save()
+            fenetre.destroy()
+            self.gerer_echantillons()
+        bouton_save = tkinter.Button(master=fenetre, command=enregistrer_ech, text="Enregistrer")
+
+        def reveal_modif():
+            bouton_reveal_modif.destroy()
+            nom_ech.pack(side=tkinter.LEFT)
+            bouton_save.pack(side=tkinter.LEFT)
+        bouton_reveal_modif =tkinter.Button(master=fenetre, command=reveal_modif, text="Modifier")
+        bouton_reveal_modif.pack(side=tkinter.LEFT)
+
+    def recap_bdd(self):
+        fenetre = tkinter.Toplevel()
+        tableau = ttk.Treeview(fenetre)
+        tableau['columns']=["count(e.id)"]
+        tableau.heading(column='#0', text="Nom")
+        tableau.heading(column='count(e.id)', text="Nombre d'échantillons")
+        #for row in RawQuery("select p.nom, count(e.id) from personne as p, echantillon as e where e.personne_id = p.id group by p.id;").bind(maBDD).execute():
+        #    tableau.insert("", 1, "", text=row['nom'], values=[row['id)']])
+        for p in Personne.select():
+            tp = tableau.insert("", 1, text=p.nom, values=[p.echantillons.count(), ""])
+            for e in p.echantillons:
+                tableau.insert(tp, "end", "", text=e.nom_echantillon)
+        tableau.pack()
 g = P2IGUI()
