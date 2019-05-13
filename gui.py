@@ -1,17 +1,16 @@
 import json
-import threading
-import time
-import tkinter
-from tkinter import filedialog, simpledialog, ttk
-from tkinter.ttk import Progressbar
-from bdd import *
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-from matplotlib.figure import Figure
-import numpy as np
-
-from serial import Serial
-from classificateur import *
 import platform
+import threading
+import tkinter
+from tkinter import filedialog, ttk
+from tkinter.ttk import Progressbar
+
+import serial
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+
+from classificateur import *
+
 
 def commande_test():
     print("test")
@@ -210,14 +209,14 @@ class P2IGUI(tkinter.Tk):
                         #self.coefs_fft_mean = [np.mean(x) for x in self.donnees.transpose()]
                         coefs_ffts = []  # on reset
                     morceau_fft = None  # pour bien faire sortir les erreurs
-
-        ml = DetecteurDeVoix()
-        if self.serial_port.isOpen():
-            t = threading.Thread(target=callback)
-            self.reconnaissance_active=True
-            t.start()
-            self.after(1000, self.afficher_fft_realtime)
-            self.after(2000, self.reset_graph_loop)
+        if self.serial_port is not None:
+            ml = DetecteurDeVoix()
+            if self.serial_port.isOpen():
+                t = threading.Thread(target=callback)
+                self.reconnaissance_active=True
+                t.start()
+                self.after(1000, self.afficher_fft_realtime)
+                self.after(2000, self.reset_graph_loop)
     def stop_reconnaissance_vocale(self):
         self.reconnaissance_active=False
     #def OLDafficher_fft_realtime(self):
@@ -326,13 +325,16 @@ class P2IGUI(tkinter.Tk):
         progessbar.stop()
 
     def setup_serial(self):
-        if platform.system() == 'Linux':  # Linux
-            self.serial_port = Serial(port="/dev/ttyACM0", baudrate=115200, timeout=1, writeTimeout=1)
-        elif platform.system() == 'Darwin':  # macOS
-            self.serial_port = Serial(port='/dev/cu.usbmodem1A161', baudrate=115200, timeout=1, writeTimeout=1)
-        else:  # Windows
-            self.serial_port = Serial(port="COM3", baudrate=115200, timeout=1, writeTimeout=1)
-
+        try:
+            if platform.system() == 'Linux':  # Linux
+                self.serial_port = serial.Serial(port="/dev/ttyACM0", baudrate=115200, timeout=1, writeTimeout=1)
+            elif platform.system() == 'Darwin':  # macOS
+                self.serial_port = serial.Serial(port='/dev/cu.usbmodem1A161', baudrate=115200, timeout=1, writeTimeout=1)
+            else:  # Windows
+                self.serial_port = serial.Serial(port="COM3", baudrate=115200, timeout=1, writeTimeout=1)
+        except serial.serialutil.SerialException:
+            self.serial_port=None
+            self.reconnaissance_active=False
     def gerer_bdd(self):
         fenetre = tkinter.Toplevel()
         self.var_id_personne = tkinter.IntVar()
@@ -352,6 +354,12 @@ class P2IGUI(tkinter.Tk):
         bouton_suppr.pack(side=tkinter.LEFT)
         bouton_ech = tkinter.Button(master=fenetre, text="Échantillons >>", command=self.gerer_echantillons)
         bouton_ech.pack(side=tkinter.RIGHT)
+        def autoriser():
+            personne = Personne.get(Personne.id==self.var_id_personne.get())
+            personne.autorisee = not personne.autorisee
+            personne.save()
+        bouton_autor = tkinter.Button(master=fenetre, text="Autoriser", command=autoriser)
+        bouton_autor.pack(side=tkinter.LEFT)
         fenetre.pack_slaves()
         fenetre.focus()
 
@@ -367,6 +375,8 @@ class P2IGUI(tkinter.Tk):
         def suppr_ech():
             e=Echantillon.get(Echantillon.id==var_id_echantillon.get())
             e.delete_instance(recursive=True)
+            fenetre.destroy()
+            self.gerer_echantillons()
         bouton_suppr = tkinter.Button(master=fenetre, text="Supprimer", command=suppr_ech)
         bouton_suppr.pack(side=tkinter.RIGHT)
 
