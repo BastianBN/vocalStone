@@ -1,19 +1,21 @@
 import os
 import pickle
+import re
 import time
-from typing import List, Tuple, Dict
+from typing import List, Dict
 
-from scipy.io.wavfile import *
-from scipy.fftpack import fft
 import numpy as np
 from matplotlib import pyplot as plt
-import re
-from sklearn import tree, metrics
+from scipy.fftpack import fft
+from scipy.io.wavfile import *
 from scipy.signal.windows import hamming
-from bdd import *
-from python_speech_features import mfcc
+from sklearn import metrics
+from sklearn.base import ClassifierMixin
+from sklearn.neural_network import MLPClassifier
 
-freq_ech = 20000
+from bdd import *
+
+freq_ech = 10000
 N=64*2 #nombre de coefficients par échantillon, il faut multiplier par 2 à cause de la moitié négative
 
 #wav_file = re.compile('^.+wav$')
@@ -35,84 +37,7 @@ def wav_coefs_morceaux(nom_fichier: str, N:int=N, T:float=0.01) -> List[List]:
         window = hamming(len(morceau))
         coefs.append(np.abs(fft(morceau*window, N)[0:N//2])) #partie réelle positive
     return coefs
-#
-#
-#def entrainer_modele(modele: tree.DecisionTreeClassifier)->tree.DecisionTreeClassifier:
-#    print("Entraînement de l'arbre de désicion")
-#    dirN=0
-#    Xlearn, Ylearn = [], []  # listes d'entrainement pour le machine learning
-#    for dos in os.listdir('echantillons-learn'):
-#        try:
-#            for fichier in os.listdir("echantillons-learn/"+dos):
-#                if wav_file.match(fichier):
-#                    print(dos+"/"+fichier)
-#                    coefs_fft = wav_coefs_morceaux("echantillons-learn/{}/{}".format(dos, fichier))
-#                    for coefs in np.abs(coefs_fft):
-#                        Xlearn.append(coefs)
-#                        Ylearn.append(dirN)
-#                    labels.append(dos)
-#            dirN += 1
-#        except NotADirectoryError:
-#            pass
-#    modele.fit(Xlearn, Ylearn)
-#    return modele
-#
-#
-#def predire_classe(modele:tree.DecisionTreeClassifier, coefs_fft:List, dirN=None, verbose=False)->int:
-#    Xtest,Ytest=[],[]
-#    for coefs in np.abs(coefs_fft):
-#        Xtest.append(coefs)
-#        Ytest.append(dirN)
-#
-#    Ypred = modele.predict(Xtest)
-#    if verbose:
-#        for i in range(1, len(Ypred)):
-#            print("prévu: {}".format(Ypred[i]))
-#            print("voulu: {}".format(Ytest[i]))
-#            if (Ytest[i] != Ypred[i]):
-#                print(i)
-#            print('------------------')
-#        print("prédictions: {}".format(modele.predict(Xtest).tolist()))
-#        print(" attendues : {}".format(Ytest))
-#        plt.matshow(metrics.confusion_matrix(Ytest, Ypred, labels=labels))
-#        plt.show()
-#    return int(np.bincount(Ypred).argmax())
-#
-#
-#def tester_modele(modele: tree.DecisionTreeClassifier) -> Tuple[List, List]:
-#    gYtest, gYpred = [], []
-#    dirN=0
-#    for dos in os.listdir('echantillons-test'):
-#        try:
-#            for fichier in os.listdir("echantillons-test/"+dos):
-#                if wav_file.match(fichier):
-#                    print(dos+"/"+fichier+" : "+str(dirN))
-#                    coefs_fft = wav_coefs_morceaux("echantillons-test/{}/{}".format(dos, fichier))
-#                    classe = predire_classe(modele, coefs_fft, dirN)
-#                    gYpred.append(classe)
-#                    gYtest.append(dirN)
-#
-#            dirN+=1
-#        except NotADirectoryError:
-#            pass
-#    return gYtest, gYpred
-#
-#modele=None
-#try:
-#    f=open('decisiontree.pickle', 'rb')
-#    modele = pickle.load(f)
-#    f.close()
-#except:
-#    modele = entrainer_modele(tree.DecisionTreeClassifier())
-#    f=open('decisiontree.pickle', 'wb+')
-#    pickle.dump(modele, f)
-#    f.close()
-#finally:
-#    f.close()
-#mc = metrics.confusion_matrix(*tester_modele(modele))
-#print(mc)
-#plt.matshow(mc)
-#plt.show()
+
 
 class BaseDetecteur():
     """
@@ -124,7 +49,7 @@ class BaseDetecteur():
     labels = []
     matrice_confusion: np.ndarray
     t1:float
-    modele: tree.DecisionTreeClassifier
+    modele: ClassifierMixin
     Xlearn, Ylearn = [], []  # listes d'entrainement pour le machine learning
     def __init__(self,
                  fichier_modele=None,
@@ -142,7 +67,7 @@ class BaseDetecteur():
         if self.modele is None:
             self.charger_fichier()
             if self.modele is None:
-                self.modele = tree.DecisionTreeClassifier()
+                self.modele = MLPClassifier(solver="lbfgs", hidden_layer_sizes=(100, 100))
                 self.entrainer_modele()
         self.N=N
         self.T=T
@@ -154,8 +79,7 @@ class BaseDetecteur():
             self.modele = pickle.load(f)
             f.close()
         except:
-            self.modele = tree.DecisionTreeClassifier()
-            self.entrainer_modele()
+            print("impossible de charger depuis le fichier "+nom_fichier)
 
     def enregistrer_modele(self, nom_fichier="decisiontree.pickle"):
         f = open(nom_fichier, 'wb+')
@@ -174,6 +98,9 @@ class BaseDetecteur():
                         for coefs in np.abs(coefs_fft):
                             self.Xlearn.append(coefs)
                             self.Ylearn.append(dirN)
+                            #for cepstrums in mfcc(coefs, freq_ech):
+                            #    self.Xlearn.append(cepstrums)
+                            #    self.Ylearn.append(dirN)
                 self.labels.append(dos)
                 dirN += 1
             except NotADirectoryError:
@@ -183,9 +110,11 @@ class BaseDetecteur():
     def predire_classe(self, coefs_fft, dirN=None, verbose=False) -> int:
         Xtest, Ytest = [], []
         for coefs in np.abs(coefs_fft):
-            for cepstrum in mfcc(coefs, freq_ech):
-                Xtest.append(cepstrum)
-                if dirN is not None:Ytest.append(dirN)
+            Xtest.append(coefs)
+            if dirN is not None: Ytest.append(dirN)
+            #for cepstrums in mfcc(coefs, freq_ech): #en fait c'est un array (1,13), donc y'a une dimension inutile
+            #    Xtest.append(cepstrums)
+            #    if dirN is not None:Ytest.append(dirN)
 
         Ypred = self.modele.predict(Xtest)
         if verbose and dirN is not None:
@@ -199,8 +128,9 @@ class BaseDetecteur():
                 print('------------------')
             print("prédictions: {}".format(self.modele.predict(Xtest).tolist()))
             print(" attendues : {}".format(Ytest))
-            plt.matshow(metrics.confusion_matrix(Ytest, Ypred))
-            plt.show()
+#            print(self.modele.predict_proba(Xtest))
+      #      plt.matshow(metrics.confusion_matrix(Ytest, Ypred))
+      #      plt.show()
 
         return int(np.bincount(Ypred).argmax())
 
@@ -251,22 +181,15 @@ class DetecteurDeVoix(BaseDetecteur):
             for echantillon in personne.echantillons:
                 print(echantillon.nom_echantillon)
                 for morceau in echantillon.morceaux:
-                    for cepstrum in mfcc(morceau.coefs, freq_ech):
-                        self.Xlearn.append(cepstrum)
-                        self.Ylearn.append(personne.id)
+                    self.Xlearn.append(morceau.coefs)
+                    self.Ylearn.append(personne.id)
+                    #for cepstrum in mfcc(morceau.coefs, freq_ech):
+                    #    self.Xlearn.append(cepstrum)
+                    #    self.Ylearn.append(personne.id)
             self.labels.append(personne.nom)
         self.modele.fit(self.Xlearn, self.Ylearn)
 
     def ajouter_echantillon_bdd(self, coefs_fft, personne, nom_echantillon):
-        #try:
-        #    personne = Personne.select().where(Personne.nom == nom_classe)
-        #except bdd.PersonneDoesNotExist:
-        #    personne = Personne.create(nom=nom_classe)
-        #try:
-        #    echantillon = Echantillon.get((Echantillon.nom_echantillon == nom_echantillon) & (Echantillon.personne == personne))
-        #except bdd.EchantillonDoesNotExist:
-        #    echantillon = Echantillon.create(nom_echantillon=nom_echantillon, personne=personne)
-
         echantillon, estilnouveau = Echantillon.get_or_create(nom_echantillon=nom_echantillon, personne=personne)
         for coefs in coefs_fft:
             m = Morceau(echantillon=echantillon)
@@ -294,21 +217,21 @@ class DetecteurDeVoix(BaseDetecteur):
         #print(classe)
         return self.labels_dict[classe]
 
-class TestP2I(DetecteurDeVoix): #classe héritée pour les tests
+class TestP2I(BaseDetecteur): #classe héritée pour les tests
     gCYtest, gCYpred = [], [] # matrice de confusion sur toutes les transformées de Fourier
     def tester_modele(self):
         coefs_fft=None
-        gYtest, gYpred = [], []
+        gYtest, gYpred, dirN = [], [],0
         for dos in os.listdir(self.dossier_test):
             try:
                 for fichier in os.listdir(self.dossier_test+"/"+dos):
                     if self.wav_file.match(fichier): #pour tous les fichiers audio
-                        dirN = self.labels_reverse[dos]
                         print(dos+"/"+fichier+" : "+str(dirN))
                         coefs_fft = wav_coefs_morceaux("{}/{}/{}".format(self.dossier_test, dos, fichier), N)
                         classe = self.predire_classe(coefs_fft, dirN, verbose=True)
                         gYpred.append(classe)
                         gYtest.append(dirN)
+                dirN+=1
             except NotADirectoryError:
                 pass
         self.matrice_confusion = metrics.confusion_matrix(gYtest, gYpred)
