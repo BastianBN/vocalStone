@@ -8,6 +8,7 @@ from tkinter.ttk import Progressbar
 import serial
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+from serial.tools import list_ports
 
 from classificateur import *
 
@@ -22,6 +23,8 @@ class P2IGUI(tkinter.Tk):
     morceau_fft = []
     reconnaissance_active = True
 
+    waterfall = [np.linspace(0, 100, 64)]
+    waterfall_index=0
     def __init__(self, *args, **kwargs):
         tkinter.Tk.__init__(self, *args, **kwargs)
         self.title("Reconnaissance vocale GUI")
@@ -60,7 +63,7 @@ class P2IGUI(tkinter.Tk):
 
         self.bdd_menu.add_command(label="Gérer", command=self.gerer_bdd)
         self.bdd_menu.add_command(label="Enregistrer un locuteur", command=self.enregistrer_echantillon)
-        self.bdd_menu.add_cascade(label="Récapitulatif", command=self.recap_bdd)
+        self.bdd_menu.add_command(label="Récapitulatif", command=self.recap_bdd)
 
         self.serial_frame = tkinter.Frame(master=self)
         self.serial_frame.pack(fill=tkinter.BOTH)  # Conteneur pour les infos liées à la détéction des voix
@@ -112,7 +115,7 @@ class P2IGUI(tkinter.Tk):
         self.add_plot(X, Y, *args, **kwargs)
 
     def setup_matplotlib_figure(self):
-        self.fig = Figure(figsize=(5, 4), dpi=100)
+        self.fig = Figure(figsize=(3,4), dpi=120)
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)  # A tk.DrawingArea.
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
@@ -201,12 +204,20 @@ class P2IGUI(tkinter.Tk):
                     if len(morceau_fft) == 64:
                         coefs_ffts.append(np.array(morceau_fft))
                         self.morceau_fft = np.array(morceau_fft)
+                        if len(self.waterfall) <= 41:
+                            self.waterfall.append(self.morceau_fft)
+                        else:
+                            if self.waterfall_index >= len(self.waterfall)-1:
+                                self.waterfall_index = 0
+                            else:
+                                self.waterfall_index += 1
+                            self.waterfall[self.waterfall_index] = morceau_fft
                         # self.plot_fft(morceau_fft)
                     else:
                         morceau_fft = None
                         continue
                     if len(
-                            coefs_ffts) > 20:  # on attend d'avoir quelques échantillons pour éviter de valier un seul faux positif
+                            coefs_ffts) > 40:  # on attend d'avoir quelques échantillons pour éviter de valier un seul faux positif
                         self.donnees = np.array(coefs_ffts)
                         classe_pred, probas = ml.predire_classe_probas(self.donnees)
                         print(classe_pred)
@@ -226,8 +237,9 @@ class P2IGUI(tkinter.Tk):
                 t = threading.Thread(target=callback)
                 self.reconnaissance_active = True
                 t.start()
-                self.after(1000, self.afficher_fft_realtime)
-                self.after(2000, self.reset_graph_loop)
+                self.after(300, self.afficher_waterfall)
+                # self.after(1000, self.afficher_fft_realtime)
+            # self.after(2000, self.reset_graph_loop)
             else:
                 print("Port série non disponible")
         else:
@@ -236,13 +248,8 @@ class P2IGUI(tkinter.Tk):
     def stop_reconnaissance_vocale(self):
         self.reconnaissance_active = False
 
-    # def OLDafficher_fft_realtime(self):
-    #    if len(self.donnees)>0:
-    #        self.plot_fft(self.coefs_fft_mean)
-    #        self.after(500, self.OLDafficher_fft_realtime)
-
     def afficher_fft_realtime(self):
-        if len(self.fft_time_series) > 0:
+        if self.donnees is not None:
             # self.fig.clear()
 
             # self.coefs_fft_mean[63]=100
@@ -254,14 +261,22 @@ class P2IGUI(tkinter.Tk):
             # to_display[63]=100
             # self.plot_fft(to_display)
 
-            self.morceau_fft[63] = 100
+            # self.morceau_fft[63] = 100
             self.plot_fft(self.morceau_fft)
+            self.fig.clear()
 
             self.after(100, self.afficher_fft_realtime)
 
     def reset_graph_loop(self):
         self.fig.clear()
         self.after(1500, self.reset_graph_loop)
+
+    def afficher_waterfall(self):
+        self.fig.clear()
+        self.fig.add_subplot(111).matshow(np.array(self.waterfall))
+        self.canvas.draw()
+        self.graph_frame.update()
+        self.after(50, self.afficher_waterfall)
 
     def enregistrer_echantillon(self):
         coefs_ffts = []
@@ -347,6 +362,14 @@ class P2IGUI(tkinter.Tk):
         progessbar.stop()
 
     def setup_serial(self):
+        ports = list_ports.comports()
+        for port in ports:
+            if "Arduino" in port.description:
+                print("Configuration de la carte {} branchée sur le port {}".format(port.description, port.device))
+                self.serial_port = serial.Serial(port=port.device, baudrate=115200, timeout=1, writeTimeout=1)
+                print(self.serial_port)
+                return None  # on sort de la boucle car on va pas configurer plusieurs ports série
+        print("Configuration automatique du port série échouée, essai de configuration manuelle")
         try:
             if platform.system() == 'Linux':  # Linux
                 self.serial_port = serial.Serial(port="/dev/ttyACM0", baudrate=115200, timeout=1, writeTimeout=1)
@@ -354,7 +377,7 @@ class P2IGUI(tkinter.Tk):
                 self.serial_port = serial.Serial(port='/dev/cu.usbmodem1A161', baudrate=115200, timeout=1,
                                                  writeTimeout=1)
             else:  # Windows
-                self.serial_port = serial.Serial(port="COM3", baudrate=115200, timeout=1, writeTimeout=1)
+                self.serial_port = serial.Serial(port="COM4", baudrate=115200, timeout=1, writeTimeout=1)
         except serial.serialutil.SerialException:
             self.serial_port = None
             self.reconnaissance_active = False
@@ -433,12 +456,14 @@ class P2IGUI(tkinter.Tk):
 
         def afficher_ech_mat():
             echantilon: Echantillon = Echantillon.get(Echantillon.id == var_id_echantillon.get())
-            coefs_fft=[]
+            coefs_fft = []
             for morceau in echantilon.morceaux:
                 coefs_fft.append(morceau.coefs)
             self.voir_matrice_ffts(np.array(coefs_fft), echantilon.personne.nom)
+
         bouton_voir_mat = tkinter.Button(master=fenetre, text="Voir matrice FFT", command=afficher_ech_mat)
         bouton_voir_mat.pack()
+
     def recap_bdd(self):
         fenetre = tkinter.Toplevel()
         tableau = ttk.Treeview(fenetre)
@@ -454,10 +479,10 @@ class P2IGUI(tkinter.Tk):
         tableau.pack()
 
     def afficher_probas(self, probas: dict):
-        s = "\n".join(["{}: {}".format(k, round(v)) for k, v in probas.items()])
+        s = "  ".join(["{}: {}".format(k, round(v)) for k, v in probas.items()])
         self.affichage_probas.configure(text=s)
 
-    def voir_matrice_ffts(self, coefs_fft:np.array, nom:str):
+    def voir_matrice_ffts(self, coefs_fft: np.array, nom: str):
         fenetre = tkinter.Toplevel()
         nom_aff = tkinter.Label(master=fenetre, text=nom)
         nom_aff.pack(fill=tkinter.BOTH)

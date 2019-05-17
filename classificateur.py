@@ -41,86 +41,15 @@ def wav_coefs_morceaux(nom_fichier: str, N: int = N, T: float = 0.01) -> List[Li
     return coefs
 
 
-#
-#
-# def entrainer_modele(modele: tree.DecisionTreeClassifier)->tree.DecisionTreeClassifier:
-#    print("Entraînement de l'arbre de désicion")
-#    dirN=0
-#    Xlearn, Ylearn = [], []  # listes d'entrainement pour le machine learning
-#    for dos in os.listdir('echantillons-learn'):
-#        try:
-#            for fichier in os.listdir("echantillons-learn/"+dos):
-#                if wav_file.match(fichier):
-#                    print(dos+"/"+fichier)
-#                    coefs_fft = wav_coefs_morceaux("echantillons-learn/{}/{}".format(dos, fichier))
-#                    for coefs in np.abs(coefs_fft):
-#                        Xlearn.append(coefs)
-#                        Ylearn.append(dirN)
-#                    labels.append(dos)
-#            dirN += 1
-#        except NotADirectoryError:
-#            pass
-#    modele.fit(Xlearn, Ylearn)
-#    return modele
-#
-#
-# def predire_classe(modele:tree.DecisionTreeClassifier, coefs_fft:List, dirN=None, verbose=False)->int:
-#    Xtest,Ytest=[],[]
-#    for coefs in np.abs(coefs_fft):
-#        Xtest.append(coefs)
-#        Ytest.append(dirN)
-#
-#    Ypred = modele.predict(Xtest)
-#    if verbose:
-#        for i in range(1, len(Ypred)):
-#            print("prévu: {}".format(Ypred[i]))
-#            print("voulu: {}".format(Ytest[i]))
-#            if (Ytest[i] != Ypred[i]):
-#                print(i)
-#            print('------------------')
-#        print("prédictions: {}".format(modele.predict(Xtest).tolist()))
-#        print(" attendues : {}".format(Ytest))
-#        plt.matshow(metrics.confusion_matrix(Ytest, Ypred, labels=labels))
-#        plt.show()
-#    return int(np.bincount(Ypred).argmax())
-#
-#
-# def tester_modele(modele: tree.DecisionTreeClassifier) -> Tuple[List, List]:
-#    gYtest, gYpred = [], []
-#    dirN=0
-#    for dos in os.listdir('echantillons-test'):
-#        try:
-#            for fichier in os.listdir("echantillons-test/"+dos):
-#                if wav_file.match(fichier):
-#                    print(dos+"/"+fichier+" : "+str(dirN))
-#                    coefs_fft = wav_coefs_morceaux("echantillons-test/{}/{}".format(dos, fichier))
-#                    classe = predire_classe(modele, coefs_fft, dirN)
-#                    gYpred.append(classe)
-#                    gYtest.append(dirN)
-#
-#            dirN+=1
-#        except NotADirectoryError:
-#            pass
-#    return gYtest, gYpred
-#
-# modele=None
-# try:
-#    f=open('decisiontree.pickle', 'rb')
-#    modele = pickle.load(f)
-#    f.close()
-# except:
-#    modele = entrainer_modele(tree.DecisionTreeClassifier())
-#    f=open('decisiontree.pickle', 'wb+')
-#    pickle.dump(modele, f)
-#    f.close()
-# finally:
-#    f.close()
-# mc = metrics.confusion_matrix(*tester_modele(modele))
-# print(mc)
-# plt.matshow(mc)
-# plt.show()
-modele_qui_predit=KNeighborsClassifier
+def transformation_coefs(coefs: list)->list:
+    #return coefs
+    return mfcc(coefs, 9000)[0]
+
+
+#modele_qui_predit = KNeighborsClassifier
 modele_qui_predit=DecisionTreeClassifier
+
+
 class BaseDetecteur():
     """
     Classe qui inclut tout le nécessaire pour analyser des coefficients de Fourier en machine learning
@@ -135,8 +64,8 @@ class BaseDetecteur():
     modele: modele_qui_predit
     Xlearn, Ylearn = [], []  # listes d'entrainement pour le machine learning
 
-    labels_dict = {0:'silence'}  # {1:"random", 2: "ljklkj" ...}
-    labels_reverse = {'silence':0}  # {'random':1, 'lkjlkj':2 ... }
+    labels_dict = {0: 'silence'}  # {1:"random", 2: "ljklkj" ...}
+    labels_reverse = {'silence': 0}  # {'random':1, 'lkjlkj':2 ... }
 
     def __init__(self,
                  fichier_modele=None,
@@ -185,7 +114,7 @@ class BaseDetecteur():
                         print(dos + "/" + fichier)
                         coefs_fft = wav_coefs_morceaux("{}/{}/{}".format(self.dossier_apprentissage, dos, fichier), N)
                         for coefs in np.abs(coefs_fft):
-                            self.Xlearn.append(coefs)
+                            self.Xlearn.append(transformation_coefs(coefs_fft))
                             self.Ylearn.append(dirN)
                 self.labels.append(dos)
                 self.labels_reverse[dirN] = dos
@@ -198,9 +127,8 @@ class BaseDetecteur():
     def predire_classe_probas(self, coefs_fft, dirN=None, verbose=False):  # ->Tuple[int, dict]:
         Xtest, Ytest = [], []
         for coefs in np.abs(coefs_fft):
-            for cepstrum in mfcc(coefs, freq_ech):
-                Xtest.append(cepstrum)
-                if dirN is not None: Ytest.append(dirN)
+            Xtest.append(transformation_coefs(coefs))
+            if dirN is not None: Ytest.append(dirN)
 
         Ypred = self.modele.predict(Xtest)
         if verbose and dirN is not None:
@@ -270,9 +198,8 @@ class DetecteurDeVoix(BaseDetecteur):
             for echantillon in personne.echantillons:
                 print(echantillon.nom_echantillon)
                 for morceau in echantillon.morceaux:
-                    for cepstrum in mfcc(morceau.coefs, freq_ech):
-                        self.Xlearn.append(cepstrum)
-                        self.Ylearn.append(personne.id)
+                    self.Xlearn.append(transformation_coefs(morceau.coefs))
+                    self.Ylearn.append(personne.id)
             self.labels.append(personne.nom)
         self.modele.fit(self.Xlearn, self.Ylearn)
 
