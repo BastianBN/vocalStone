@@ -8,8 +8,11 @@ from scipy.fftpack import fft
 import numpy as np
 from matplotlib import pyplot as plt
 import re
-from sklearn import tree, metrics
+from sklearn import metrics
 from scipy.signal.windows import hamming
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+
 from bdd import *
 from python_speech_features import mfcc
 
@@ -116,7 +119,8 @@ def wav_coefs_morceaux(nom_fichier: str, N: int = N, T: float = 0.01) -> List[Li
 # print(mc)
 # plt.matshow(mc)
 # plt.show()
-
+modele_qui_predit=KNeighborsClassifier
+modele_qui_predit=DecisionTreeClassifier
 class BaseDetecteur():
     """
     Classe qui inclut tout le nécessaire pour analyser des coefficients de Fourier en machine learning
@@ -128,7 +132,7 @@ class BaseDetecteur():
     labels = []
     matrice_confusion: np.ndarray
     t1: float
-    modele: tree.DecisionTreeClassifier
+    modele: modele_qui_predit
     Xlearn, Ylearn = [], []  # listes d'entrainement pour le machine learning
 
     labels_dict = {0:'silence'}  # {1:"random", 2: "ljklkj" ...}
@@ -150,7 +154,7 @@ class BaseDetecteur():
         if self.modele is None:
             self.charger_fichier()
             if self.modele is None:
-                self.modele = tree.DecisionTreeClassifier()
+                self.modele = modele_qui_predit()
                 self.entrainer_modele()
         self.N = N
         self.T = T
@@ -163,7 +167,7 @@ class BaseDetecteur():
             self.modele = pickle.load(f)
             f.close()
         except:
-            self.modele = tree.DecisionTreeClassifier()
+            self.modele = modele_qui_predit()
             self.entrainer_modele()
 
     def enregistrer_modele(self, nom_fichier="decisiontree.pickle"):

@@ -289,6 +289,7 @@ class P2IGUI(tkinter.Tk):
                 morceau.coefs = numpy.array(tab)
                 morceau.save()
             fenetre_rec.destroy()  # fini !
+            self.voir_matrice_ffts(np.array(coefs_ffts), personne.nom)
 
         bouton_save = tkinter.Button(master=fenetre_rec, text="Ajouter à la BDD", command=handle_save, state='disabled')
         bouton_save.pack()
@@ -353,7 +354,7 @@ class P2IGUI(tkinter.Tk):
                 self.serial_port = serial.Serial(port='/dev/cu.usbmodem1A161', baudrate=115200, timeout=1,
                                                  writeTimeout=1)
             else:  # Windows
-                self.serial_port = serial.Serial(port="COM4", baudrate=115200, timeout=1, writeTimeout=1)
+                self.serial_port = serial.Serial(port="COM3", baudrate=115200, timeout=1, writeTimeout=1)
         except serial.serialutil.SerialException:
             self.serial_port = None
             self.reconnaissance_active = False
@@ -430,6 +431,14 @@ class P2IGUI(tkinter.Tk):
         bouton_reveal_modif = tkinter.Button(master=fenetre, command=reveal_modif, text="Modifier")
         bouton_reveal_modif.pack(side=tkinter.LEFT)
 
+        def afficher_ech_mat():
+            echantilon: Echantillon = Echantillon.get(Echantillon.id == var_id_echantillon.get())
+            coefs_fft=[]
+            for morceau in echantilon.morceaux:
+                coefs_fft.append(morceau.coefs)
+            self.voir_matrice_ffts(np.array(coefs_fft), echantilon.personne.nom)
+        bouton_voir_mat = tkinter.Button(master=fenetre, text="Voir matrice FFT", command=afficher_ech_mat)
+        bouton_voir_mat.pack()
     def recap_bdd(self):
         fenetre = tkinter.Toplevel()
         tableau = ttk.Treeview(fenetre)
@@ -447,5 +456,21 @@ class P2IGUI(tkinter.Tk):
     def afficher_probas(self, probas: dict):
         s = "\n".join(["{}: {}".format(k, round(v)) for k, v in probas.items()])
         self.affichage_probas.configure(text=s)
+
+    def voir_matrice_ffts(self, coefs_fft:np.array, nom:str):
+        fenetre = tkinter.Toplevel()
+        nom_aff = tkinter.Label(master=fenetre, text=nom)
+        nom_aff.pack(fill=tkinter.BOTH)
+        fig = Figure(figsize=(5, 4), dpi=100)
+        fig.add_subplot(111).matshow(coefs_fft)
+        canvas = FigureCanvasTkAgg(fig, master=fenetre)  # A tk.DrawingArea.
+        canvas.draw()
+        canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
+        canvas.draw()
+
+    #    self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)  # A tk.DrawingArea.
+    #    self.canvas.draw()
+    #    self.canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
+
 
 g = P2IGUI()
