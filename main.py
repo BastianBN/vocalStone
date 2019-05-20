@@ -3,11 +3,12 @@
 # Vitesse de baud : 9600
 # Timeout en lecture : 1 sec
 # Timeout en écriture : 1 sec
-import time
-from serial import Serial
-from classificateur import *
 import platform
+
 from pyfiglet import Figlet
+from serial import Serial
+
+from classificateur import *
 
 #f=open("decisiontree.pickle")
 #modele = pickle.load(f)
@@ -54,9 +55,8 @@ with serial_port as port_serie:
                     donnees = np.array(coefs_ffts)
                     classe_pred = ml.predire_classe_texte(donnees)
                     print(classe_pred)
-                    #if classe_pred in classes_valides:
-                    #    print("Personne autorisée à entrer !")
-                    #    print(f.renderText(classe_pred))
+                    if classe_pred in ml.classes_autorisees:
+                        print("{} est autorisé(e) à entrer !".format(classe_pred))
                     coefs_ffts = [] #on reset
                 morceau_fft = None  # pour bien faire sortir les erreurs
             #if time.time()-t1 > 20:

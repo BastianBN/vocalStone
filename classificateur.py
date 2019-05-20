@@ -1,20 +1,19 @@
 import os
 import pickle
+import re
 import time
-from typing import List, Tuple, Dict
+from typing import List
 
-from scipy.io.wavfile import *
-from scipy.fftpack import fft
 import numpy as np
 from matplotlib import pyplot as plt
-import re
-from sklearn import metrics
+from python_speech_features import mfcc
+from scipy.fftpack import fft
+from scipy.io.wavfile import *
 from scipy.signal.windows import hamming
+from sklearn import metrics
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.tree import DecisionTreeClassifier
 
 from bdd import *
-from python_speech_features import mfcc
 
 freq_ech = 20000
 N = 64 * 2  # nombre de coefficients par échantillon, il faut multiplier par 2 à cause de la moitié négative
@@ -46,8 +45,8 @@ def transformation_coefs(coefs: list)->list:
     return mfcc(coefs, 9000)[0]
 
 
-#modele_qui_predit = KNeighborsClassifier
-modele_qui_predit=DecisionTreeClassifier
+modele_qui_predit = KNeighborsClassifier
+#modele_qui_predit=DecisionTreeClassifier
 
 
 class BaseDetecteur():
@@ -66,6 +65,8 @@ class BaseDetecteur():
 
     labels_dict = {0: 'silence'}  # {1:"random", 2: "ljklkj" ...}
     labels_reverse = {'silence': 0}  # {'random':1, 'lkjlkj':2 ... }
+
+    classes_autorisees = ['jean'] #les gens dedans vont être autorisées pas le système
 
     def __init__(self,
                  fichier_modele=None,
@@ -168,7 +169,9 @@ class BaseDetecteur():
         print(classe)
         return self.labels[classe]
 
-
+    def autoriser_personne_probas(self, coefs_fft):#->Tuple[str, dict, bool]:
+        classe, probas = self.predire_classe_probas(coefs_fft)
+        return classe, probas, (classe in self.classes_autorisees)
 class DetecteurDeVoix(BaseDetecteur):
     # bdd:Database = None
     # def __init__(self, fichier_modele=None, modele=None,
@@ -180,9 +183,12 @@ class DetecteurDeVoix(BaseDetecteur):
 
     def __init__(self, **kwargs):
         try:
+            self.classes_autorisees=[] #on annule l'attribut hérité
             for personne in Personne.select():
                 self.labels_dict[personne.id] = personne.nom
                 self.labels_reverse[personne.nom] = personne.id
+                if personne.autorisee:
+                    self.classes_autorisees.append(personne.nom)
             print(self.labels_dict)
         except:
             print("aucune classe déterminée")

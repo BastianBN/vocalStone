@@ -23,6 +23,13 @@ class Echantillon(Model):
     personne = ForeignKeyField(Personne, backref='echantillons')
     nom_echantillon = CharField(max_length=255)
 
+    @property
+    def matrice(self)->numpy.array:
+        morceaux = []
+        for morceau in self.morceaux:
+            morceaux.append(morceau.coefs)
+        return numpy.array(morceaux)
+
 class Morceau(Model):
     class Meta:
         database = maBDD

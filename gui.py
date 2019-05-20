@@ -123,8 +123,11 @@ class P2IGUI(tkinter.Tk):
         # self.toolbar.update()
         # self.canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
 
-    def afficher_nom(self, nom: str):
-        self.nom.configure(text=nom)
+    def afficher_nom(self, nom: str, autorise: bool):
+        if autorise:
+            self.nom.configure(text=nom, fg='green')
+        else:
+            self.nom.configure(text=nom, fg='red')
 
     def afficher_bastian(self):
         self.afficher_nom("bastian")
@@ -219,9 +222,10 @@ class P2IGUI(tkinter.Tk):
                     if len(
                             coefs_ffts) > 40:  # on attend d'avoir quelques échantillons pour éviter de valier un seul faux positif
                         self.donnees = np.array(coefs_ffts)
-                        classe_pred, probas = ml.predire_classe_probas(self.donnees)
+                        #classe_pred, probas = ml.predire_classe_probas(self.donnees)
+                        classe_pred, probas, autorise = ml.autoriser_personne_probas(self.donnees)
                         print(classe_pred)
-                        self.afficher_nom(classe_pred)
+                        self.afficher_nom(classe_pred, autorise)
                         self.afficher_probas(probas)
                         # if classe_pred in classes_valides:
                         #    print("Personne autorisée à entrer !")
