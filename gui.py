@@ -25,6 +25,7 @@ class P2IGUI(tkinter.Tk):
 
     waterfall = [np.linspace(0, 100, 64)]
     waterfall_index=0
+    serial_port:serial.Serial
     def __init__(self, *args, **kwargs):
         tkinter.Tk.__init__(self, *args, **kwargs)
         self.title("Reconnaissance vocale GUI")
@@ -224,6 +225,8 @@ class P2IGUI(tkinter.Tk):
                         self.donnees = np.array(coefs_ffts)
                         #classe_pred, probas = ml.predire_classe_probas(self.donnees)
                         classe_pred, probas, autorise = ml.autoriser_personne_probas(self.donnees)
+                        if autorise:
+                            self.serial_port.write(1)
                         print(classe_pred)
                         self.afficher_nom(classe_pred, autorise)
                         self.afficher_probas(probas)

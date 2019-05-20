@@ -16,6 +16,7 @@ void setup() {
  
     sampling_period_us = round(1000000*(1.0/SAMPLING_FREQUENCY));
     Serial.println("restart");
+    pinMode(13, OUTPUT);
 }
  
 void loop() {
@@ -53,7 +54,12 @@ void loop() {
      //   Serial.println(0);
     }
     Serial.println("end");
-    
+    if(Serial.available()>0){
+      /*int incomingB = Serial.read();
+      if (incomingB==1) {*/
+        digitalWrite(13, HIGH);
+      //
+    }
    // Serial.println("200 200");
     //Serial.println("0 0");
  
