@@ -3,8 +3,8 @@ from io import BytesIO
 import numpy
 from peewee import *
 
-maBDD = MySQLDatabase('G223_B_BD2', user='G223_B', password='G223_B', host='pc-tp-mysql.insa-lyon.fr', port=3306)
-#bdd = PostgresqlDatabase('p2i', user='p2i', password='wheatstone', host='vps.ribes.ovh', port=5432)
+#maBDD = MySQLDatabase('G223_B_BD2', user='G223_B', password='G223_B', host='pc-tp-mysql.insa-lyon.fr', port=3306)
+maBDD = PostgresqlDatabase('p2i', user='p2i', password='wheatstone', host='vps.ribes.ovh', port=5432)
 maBDD.connect()
 
 class Personne(Model):

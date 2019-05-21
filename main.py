@@ -19,10 +19,11 @@ if platform.system() == 'Linux': #Linux
 elif platform.system() == 'Darwin': #macOS
     serial_port = Serial(port='/dev/cu.usbmodem1A151', baudrate=115200, timeout=1, writeTimeout=1)
 else: #Windows
-    serial_port = Serial(port="COM3", baudrate=115200, timeout=1, writeTimeout=1)
+    serial_port = Serial(port="COM4", baudrate=115200, timeout=1, writeTimeout=1)
 t1=time.time()
 ml = DetecteurDeVoix()
 f = Figlet(font='slant')
+SEUIL_DETECTION= 800
 with serial_port as port_serie:
     morceau_fft=None
     if port_serie.isOpen():
@@ -47,16 +48,24 @@ with serial_port as port_serie:
                 pass
             if ligne == b'end' and morceau_fft is not None:
                 if len(morceau_fft) == 64:
-                    coefs_ffts.append(np.array(morceau_fft))
+                    a = np.array(morceau_fft)
+                    if(a.max() > SEUIL_DETECTION): #détection sur le volume
+                        coefs_ffts.append(a)
+                    print(str(a.max())+", ", end='')
                 else:
                     morceau_fft=None
                     continue
                 if len(coefs_ffts)>20: #on attend d'avoir quelques échantillons pour éviter de valier un seul faux positif
                     donnees = np.array(coefs_ffts)
+                    print("  ## "
+                          ""+str(donnees.max()))
                     classe_pred = ml.predire_classe_texte(donnees)
-                    print(classe_pred)
+                    print("  ".join(["{}: {}".format(k, round(v)) for k, v in probas.items()]))
                     if classe_pred in ml.classes_autorisees:
                         print("{} est autorisé(e) à entrer !".format(classe_pred))
+                        port_serie.write(1)
+                    else:
+                        print(classe_pred)
                     coefs_ffts = [] #on reset
                 morceau_fft = None  # pour bien faire sortir les erreurs
             #if time.time()-t1 > 20:

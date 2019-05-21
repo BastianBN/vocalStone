@@ -4,28 +4,202 @@ import threading
 import tkinter
 from tkinter import filedialog, ttk
 from tkinter.ttk import Progressbar
+from typing import Optional, Callable
 
 import serial
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from serial.tools import list_ports
+from matplotlib import pyplot as plt
 
 from classificateur import *
 
+SEUIL_DETECTION = 500
+NOMBRE_FFT_RECONNAISSANCE = 10  # matrice de (x,64) coefficients de fourier
 
-def commande_test():
-    print("test")
 
-
-class P2IGUI(tkinter.Tk):
-    coefs_fft_mean: List = []
-    fft_time_series = [[], [], [], [], [], [], [], [], [], []]
-    morceau_fft = []
+class P2I(object):
     reconnaissance_active = True
 
     waterfall = [np.linspace(0, 100, 64)]
-    waterfall_index=0
-    serial_port:serial.Serial
+    waterfall_index = 0
+    serial_port: serial.Serial
+    ml: DetecteurDeVoix
+
+    def __init__(self):
+        self.setup_serial()
+        self.lancer_reconnaissance_vocale()
+
+    def plot(self, X, Y, *args, **kwargs):
+        plt.plot(X, Y, *args, **kwargs)
+
+    def afficher_nom(self, nom: str, autorise: Optional[bool]):
+        if autorise is not None:
+            print("{} {} autorisé(e)".format(nom, "est" if autorise else "n'est pas"))
+        else:
+            print(nom)
+
+    def afficher_bastian(self):
+        self.afficher_nom("bastian")
+
+    def plot_fft(self, coefs_fft):
+        X, Y, i = [], [], 0
+        for coef in coefs_fft:
+            X.append(i)
+            X.append(i)
+            X.append(i)
+            Y.append(0)
+            Y.append(coef)
+            Y.append(0)
+            i += 1
+        self.add_plot(X, Y)
+
+    def add_plot(self, X, Y):
+        self.plot(X, Y)
+
+    def lancer_reconnaissance_vocale(self):
+        print("Reconnaissance vocale dans le terminal")
+        if self.serial_port is not None:
+            self.ml = DetecteurDeVoix()
+            if self.serial_port.isOpen():
+                self.reconnaitre_voix()
+                # self.after(1000, self.afficher_fft_realtime)
+            # self.after(2000, self.reset_graph_loop)
+            else:
+                print("Port série non disponible")
+        else:
+            print("port série non config")
+
+    def reconnaitre_voix(self):
+        morceau_fft = None
+        self.coefs_ffts = []
+        while self.reconnaissance_active:
+            ligne = self.serial_port.readline().replace(b'\r\n', b'')
+            if ligne == b'restart':
+                print("Remise à zéro des tableaux, parlez maintenant")
+                self.coefs_ffts = []
+                morceau_fft = []
+                continue
+            if ligne == b"begin":
+                morceau_fft = []  # une transformée de Fourier
+                continue
+            # if ligne != b'end' and ligne != b'begin' and ligne !=b'\n' and ligne != b'' and ligne != b'restart' and morceau_fft is not None:
+            # print(ligne)
+            try:
+                nombre = float(ligne.decode('utf-8'))
+                if ligne != 'end' and morceau_fft is not None:
+                    morceau_fft.append(nombre)
+            except (UnicodeDecodeError, ValueError):
+                pass
+            if ligne == b'end' and morceau_fft is not None:
+                if len(morceau_fft) == 64:
+                    fft_array = np.array(morceau_fft)
+                    if fft_array.max() > SEUIL_DETECTION:
+                        self.coefs_ffts.append(fft_array)
+                        if len(self.waterfall) <= NOMBRE_FFT_RECONNAISSANCE:
+                            self.waterfall.append(fft_array)
+                        else:
+                            if self.waterfall_index >= len(self.waterfall) - 1:
+                                self.waterfall_index = 0
+                            else:
+                                self.waterfall_index += 1
+                            self.waterfall[self.waterfall_index] = fft_array
+                    else:
+                        print(fft_array.max())
+                else:
+                    morceau_fft = None
+                    continue
+                if len(
+                        self.coefs_ffts) > NOMBRE_FFT_RECONNAISSANCE:  # on attend d'avoir quelques échantillons pour éviter de valier un seul faux positif
+                    self.donnees = np.array(self.coefs_ffts)
+                    if self.donnees.max() > 900:
+                        # classe_pred, probas = ml.predire_classe_probas(self.donnees)
+                        classe_pred, probas, autorise = self.ml.autoriser_personne_probas(self.donnees)
+                        if autorise:
+                            self.serial_port.write(1)
+                        self.afficher_nom(classe_pred, autorise)
+                        self.afficher_probas(probas)
+                        # if classe_pred in classes_valides:
+                        #    print("Personne autorisée à entrer !")
+                        #    print(f.renderText(classe_pred))
+                        # self.coefs_fft_mean = [np.mean(x) for x in self.donnees.transpose()]
+                        coefs_ffts = []  # on reset
+                    else:
+                        print("le maximum d'amplitude est inférieur à 900, on considère que personne n'a parlé")
+                morceau_fft = None  # pour bien faire sortir les erreurs
+
+    def stop_reconnaissance_vocale(self):
+        self.reconnaissance_active = False
+
+    def afficher_waterfall(self):
+        plt.matshow(self.waterfall)
+
+    def setup_serial(self):
+        ports = list_ports.comports()
+        for port in ports:
+            if "Arduino" in port.description:
+                print("Configuration de la carte {} branchée sur le port {}".format(port.description, port.device))
+                self.serial_port = serial.Serial(port=port.device, baudrate=115200, timeout=1, writeTimeout=1)
+                print(self.serial_port)
+                return None  # on sort de la boucle car on va pas configurer plusieurs ports série
+        print("Configuration automatique du port série échouée, essai de configuration manuelle")
+        try:
+            if platform.system() == 'Linux':  # Linux
+                self.serial_port = serial.Serial(port="/dev/ttyACM0", baudrate=115200, timeout=1, writeTimeout=1)
+            elif platform.system() == 'Darwin':  # macOS
+                self.serial_port = serial.Serial(port='/dev/cu.usbmodem1A161', baudrate=115200, timeout=1,
+                                                 writeTimeout=1)
+            else:  # Windows
+                self.serial_port = serial.Serial(port="COM4", baudrate=115200, timeout=1, writeTimeout=1)
+        except serial.serialutil.SerialException:
+            self.serial_port = None
+            self.reconnaissance_active = False
+            print("Port série non configuré")
+
+    def afficher_probas(self, probas: dict):
+        print("  ".join(["{}: {}".format(k, round(v)) for k, v in probas.items()]))
+
+    def voir_matrice_ffts(self, coefs_fft: np.array, nom: str):
+        plt.matshow(coefs_fft)
+
+    def lancer_enregistrement(self, callback: Optional[Callable]):
+        morceau_fft = None
+        self.coefs_ffts = []
+        if self.serial_port.isOpen():
+            print("Début enregistrement")
+            while len(self.coefs_ffts) <= NOMBRE_FFT_RECONNAISSANCE:
+                ligne = self.serial_port.readline().replace(b'\r\n', b'')
+                if ligne == b"begin":
+                    morceau_fft = []  # une transformée de Fourier
+                    # progessbar.step(len(coefs_ffts))
+                    continue
+                if ligne == b'end' and morceau_fft is not None:
+                    if len(morceau_fft) == 64:
+                        fft_array = np.array(morceau_fft)
+                        if fft_array.max() > SEUIL_DETECTION:
+                            self.coefs_ffts.append(fft_array)
+                        else:
+                            print(fft_array.max())
+                    else:
+                        morceau_fft = None
+                        continue
+                try:
+                    nombre = float(ligne.decode('utf-8'))
+                    if morceau_fft is not None:
+                        morceau_fft.append(nombre)
+                except (UnicodeDecodeError, ValueError):
+                    pass
+            print("Fin enregistrement")
+            callback()
+    #    self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)  # A tk.DrawingArea.
+    #    self.canvas.draw()
+    #    self.canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
+
+
+class GUI(P2I, tkinter.Tk):  # héritage multiple :)
+    morceau_fft = []
+    reconnaissance_active = True
+
     def __init__(self, *args, **kwargs):
         tkinter.Tk.__init__(self, *args, **kwargs)
         self.title("Reconnaissance vocale GUI")
@@ -37,12 +211,10 @@ class P2IGUI(tkinter.Tk):
         self.file_menu = tkinter.Menu(self.menu_bar, tearoff=0)
         self.detection_menu = tkinter.Menu(self.menu_bar, tearoff=0)
         self.graph_menu = tkinter.Menu(self.menu_bar, tearoff=0)
-        self.test_menu = tkinter.Menu(self.menu_bar, tearoff=0)
         self.bdd_menu = tkinter.Menu(self.menu_bar, tearoff=0)
 
         self.menu_bar.add_cascade(label="Fichier", menu=self.file_menu)
         self.menu_bar.add_cascade(label="Détection", menu=self.detection_menu)
-        self.menu_bar.add_cascade(label="Test", menu=self.test_menu)
         self.menu_bar.add_cascade(label="Graphique", menu=self.graph_menu)
         self.menu_bar.add_cascade(label="Base de données", menu=self.bdd_menu)
         self.config(menu=self.menu_bar)
@@ -50,14 +222,9 @@ class P2IGUI(tkinter.Tk):
         self.file_menu.add_command(label="Analyser un ficher audio WAV", command=self.choisir_fichier_et_analyser)
         self.file_menu.add_command(label="Quitter", command=self.destroy)
 
-        self.detection_menu.add_command(label="Détecter un loctuer avec Arduino", command=self.reconnaitre_voix)
+        self.detection_menu.add_command(label="Détecter un loctuer avec Arduino",
+                                        command=self.lancer_reconnaissance_vocale)
         self.detection_menu.add_command(label="Arrêter la détection", command=self.stop_reconnaissance_vocale)
-
-        self.test_menu.add_command(label="Exécuter commande_test", command=commande_test)
-        self.test_menu.add_command(label="Courbe 2", command=self.courbe2)
-        self.test_menu.add_command(label="Courbe 3", command=self.courbe3)
-        self.test_menu.add_command(label="Afficher Bastian", command=self.afficher_bastian)
-        self.test_menu.add_command(label="Thread test", command=self.long_test)
 
         self.graph_menu.add_command(label="Afficher le graph tampon", command=self.plot_data)
         self.graph_menu.add_command(label="Effacer le graphique", command=self.reset_graph)
@@ -79,7 +246,7 @@ class P2IGUI(tkinter.Tk):
         tkinter.Button(master=self.serial_frame, text="Modifier la base de données", command=self.gerer_bdd).pack(
             side=tkinter.LEFT)
         tkinter.Button(master=self.serial_frame, text="Lancer la reconnaissance vocale",
-                       command=self.reconnaitre_voix).pack(side=tkinter.LEFT)
+                       command=self.lancer_reconnaissance_vocale).pack(side=tkinter.LEFT)
 
         self.setup_matplotlib_figure()
 
@@ -89,20 +256,6 @@ class P2IGUI(tkinter.Tk):
         self.config(menu=self.menu_bar)
         self.setup_serial()
         self.mainloop()
-
-    def courbe2(self):
-        x = np.linspace(1, 10)
-        y = np.exp(x)
-        self.plot(x, y)
-        pass
-
-    def courbe3(self):
-        x = np.linspace(1, 5)
-        y = np.power(x, 2)
-        self.add_plot(x, y)
-        # self.fig.add_subplot(111).plot(x, y)
-        # self.canvas.draw()
-        # self.graph_frame.update()
 
     def add_plot(self, X, Y, *args, **kwargs):
         # print("add plot")
@@ -116,7 +269,7 @@ class P2IGUI(tkinter.Tk):
         self.add_plot(X, Y, *args, **kwargs)
 
     def setup_matplotlib_figure(self):
-        self.fig = Figure(figsize=(3,4), dpi=120)
+        self.fig = Figure(figsize=(3, 4), dpi=120)
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)  # A tk.DrawingArea.
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
@@ -129,33 +282,6 @@ class P2IGUI(tkinter.Tk):
             self.nom.configure(text=nom, fg='green')
         else:
             self.nom.configure(text=nom, fg='red')
-
-    def afficher_bastian(self):
-        self.afficher_nom("bastian")
-
-    def long_test(self):
-        def callback():
-            print("thread start")
-            time.sleep(3)
-            print("thread end")
-            self.afficher_nom("thread finished")
-
-        t = threading.Thread(target=callback)
-        t.start()
-        print("thread started")
-        self.afficher_nom("thread started")
-
-    def plot_fft(self, coefs_fft):
-        X, Y, i = [], [], 0
-        for coef in coefs_fft:
-            X.append(i)
-            X.append(i)
-            X.append(i)
-            Y.append(0)
-            Y.append(coef)
-            Y.append(0)
-            i += 1
-        self.add_plot(X, Y)
 
     def choisir_fichier_et_analyser(self):
         nom_fichier = filedialog.askopenfilename(
@@ -179,69 +305,15 @@ class P2IGUI(tkinter.Tk):
         self.canvas.draw()
         self.graph_frame.update()
 
-    def reconnaitre_voix(self):
+    def lancer_reconnaissance_vocale(self):
         classes_valides = ['bastian',
                            'jean']  # les numéros des dossiers avec le nom des personnes à reconnaître 0=bastian, 1=jean
-
-        def callback():
-            morceau_fft = None
-            coefs_ffts = []
-            while self.reconnaissance_active:
-                ligne = self.serial_port.readline().replace(b'\r\n', b'')
-                if ligne == b'restart':
-                    print("Remise à zéro des tableaux, parlez maintenant")
-                    coefs_ffts = []
-                    morceau_fft = []
-                    continue
-                if ligne == b"begin":
-                    morceau_fft = []  # une transformée de Fourier
-                    continue
-                # if ligne != b'end' and ligne != b'begin' and ligne !=b'\n' and ligne != b'' and ligne != b'restart' and morceau_fft is not None:
-                # print(ligne)
-                try:
-                    nombre = float(ligne.decode('utf-8'))
-                    if ligne != 'end' and morceau_fft is not None:
-                        morceau_fft.append(nombre)
-                except (UnicodeDecodeError, ValueError):
-                    pass
-                if ligne == b'end' and morceau_fft is not None:
-                    if len(morceau_fft) == 64:
-                        coefs_ffts.append(np.array(morceau_fft))
-                        self.morceau_fft = np.array(morceau_fft)
-                        if len(self.waterfall) <= 41:
-                            self.waterfall.append(self.morceau_fft)
-                        else:
-                            if self.waterfall_index >= len(self.waterfall)-1:
-                                self.waterfall_index = 0
-                            else:
-                                self.waterfall_index += 1
-                            self.waterfall[self.waterfall_index] = morceau_fft
-                        # self.plot_fft(morceau_fft)
-                    else:
-                        morceau_fft = None
-                        continue
-                    if len(
-                            coefs_ffts) > 40:  # on attend d'avoir quelques échantillons pour éviter de valier un seul faux positif
-                        self.donnees = np.array(coefs_ffts)
-                        #classe_pred, probas = ml.predire_classe_probas(self.donnees)
-                        classe_pred, probas, autorise = ml.autoriser_personne_probas(self.donnees)
-                        if autorise:
-                            self.serial_port.write(1)
-                        print(classe_pred)
-                        self.afficher_nom(classe_pred, autorise)
-                        self.afficher_probas(probas)
-                        # if classe_pred in classes_valides:
-                        #    print("Personne autorisée à entrer !")
-                        #    print(f.renderText(classe_pred))
-
-                        # self.coefs_fft_mean = [np.mean(x) for x in self.donnees.transpose()]
-                        coefs_ffts = []  # on reset
-                    morceau_fft = None  # pour bien faire sortir les erreurs
-
+        self.ml = DetecteurDeVoix()
+        print("ml")
         if self.serial_port is not None:
-            ml = DetecteurDeVoix()
             if self.serial_port.isOpen():
-                t = threading.Thread(target=callback)
+
+                t = threading.Thread(target=self.reconnaitre_voix)
                 self.reconnaissance_active = True
                 t.start()
                 self.after(300, self.afficher_waterfall)
@@ -286,7 +358,7 @@ class P2IGUI(tkinter.Tk):
         self.after(50, self.afficher_waterfall)
 
     def enregistrer_echantillon(self):
-        coefs_ffts = []
+        self.coefs_ffts = []
         fenetre_rec = tkinter.Toplevel()
         fenetre_rec.title("Enregistrement d'un nouvel échantillon")
         fenetre_rec.pack_propagate()
@@ -295,55 +367,37 @@ class P2IGUI(tkinter.Tk):
         # progessbar.pack()
         nom_input = tkinter.Entry(master=fenetre_rec)
         nom_input.pack()
+        personne: Personne = None
 
         def handle_save():
             nom = nom_input.get()
             print([x.nom for x in Personne.select().where(Personne.nom == nom)])
             with open(nom + ".json", "w+") as f:  # enregistrement et fin du prgm
-                json.dump(coefs_ffts, f)
+                json.dump([x.tolist() for x in self.coefs_ffts], f)
             f.close()
             personne, b = Personne.get_or_create(nom=nom)
             lt = time.localtime()
             maintenant = str(lt.tm_hour) + ":" + str(lt.tm_min)
             echantillon = Echantillon.create(personne=personne, nom_echantillon=maintenant)
-            for tab in coefs_ffts:
+            for tab in self.coefs_ffts:
                 morceau = Morceau(echantillon=echantillon)
                 morceau.coefs = numpy.array(tab)
                 morceau.save()
             fenetre_rec.destroy()  # fini !
-            self.voir_matrice_ffts(np.array(coefs_ffts), personne.nom)
 
         bouton_save = tkinter.Button(master=fenetre_rec, text="Ajouter à la BDD", command=handle_save, state='disabled')
         bouton_save.pack()
 
         def handle_fin_rec():
+            print("finalisation enregistrement")
             progessbar.stop()
             bouton_save.configure(state='normal')
+            self.voir_matrice_ffts(np.array(self.coefs_ffts), nom="")
 
         def handle_rec():
             bouton_rec.configure(state='disabled')
             # progessbar.start()
-            morceau_fft = None
-            if self.serial_port.isOpen():
-                print("Début enregistrement")
-                while len(coefs_ffts) <= 40:
-                    ligne = self.serial_port.readline().replace(b'\r\n', b'')
-                    if ligne == b"begin":
-                        morceau_fft = []  # une transformée de Fourier
-                        # progessbar.step(len(coefs_ffts))
-                        continue
-                    if ligne != b'end' and ligne != b'begin' and ligne != b'\n' and ligne != b'' and morceau_fft is not None:
-                        nombre = float(ligne.decode('utf-8'))
-                        if ligne != 'end':
-                            morceau_fft.append(nombre)
-                    if ligne == b'end' and morceau_fft is not None:
-                        if len(morceau_fft) == 64:
-                            coefs_ffts.append(morceau_fft)
-                        else:
-                            morceau_fft = None
-                            continue
-
-            fenetre_rec.after(4000, handle_fin_rec)
+            self.lancer_enregistrement(handle_fin_rec)
 
         bouton_rec = tkinter.Button(fenetre_rec, text="Démarrer l'enregistrement", command=handle_rec)
         bouton_rec.pack()
@@ -367,28 +421,6 @@ class P2IGUI(tkinter.Tk):
         # time.sleep(3)
         fenetre_rec.pack_slaves()
         progessbar.stop()
-
-    def setup_serial(self):
-        ports = list_ports.comports()
-        for port in ports:
-            if "Arduino" in port.description:
-                print("Configuration de la carte {} branchée sur le port {}".format(port.description, port.device))
-                self.serial_port = serial.Serial(port=port.device, baudrate=115200, timeout=1, writeTimeout=1)
-                print(self.serial_port)
-                return None  # on sort de la boucle car on va pas configurer plusieurs ports série
-        print("Configuration automatique du port série échouée, essai de configuration manuelle")
-        try:
-            if platform.system() == 'Linux':  # Linux
-                self.serial_port = serial.Serial(port="/dev/ttyACM0", baudrate=115200, timeout=1, writeTimeout=1)
-            elif platform.system() == 'Darwin':  # macOS
-                self.serial_port = serial.Serial(port='/dev/cu.usbmodem1A161', baudrate=115200, timeout=1,
-                                                 writeTimeout=1)
-            else:  # Windows
-                self.serial_port = serial.Serial(port="COM4", baudrate=115200, timeout=1, writeTimeout=1)
-        except serial.serialutil.SerialException:
-            self.serial_port = None
-            self.reconnaissance_active = False
-            print("Port série non configuré")
 
     def gerer_bdd(self):
         fenetre = tkinter.Toplevel()
@@ -500,9 +532,7 @@ class P2IGUI(tkinter.Tk):
         canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
         canvas.draw()
 
-    #    self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)  # A tk.DrawingArea.
-    #    self.canvas.draw()
-    #    self.canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
 
+# s = P2I() #test terminal
 
-g = P2IGUI()
+g = GUI()

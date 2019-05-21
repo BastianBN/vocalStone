@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Diagram>
+  <ID>DATABASE</ID>
+  <OriginalElement>6fc7fc5e-9711-452e-a350-1503a10b01d0</OriginalElement>
+  <nodes>
+    <node x="210.0" y="144.0">6fc7fc5e-9711-452e-a350-1503a10b01d0.TABLE:G223_B_BD2.entree</node>
+    <node x="23.0" y="310.0">6fc7fc5e-9711-452e-a350-1503a10b01d0.TABLE:G223_B_BD2.morceau</node>
+    <node x="0.0" y="155.0">6fc7fc5e-9711-452e-a350-1503a10b01d0.TABLE:G223_B_BD2.echantillon</node>
+    <node x="138.5" y="0.0">6fc7fc5e-9711-452e-a350-1503a10b01d0.TABLE:G223_B_BD2.personne</node>
+  </nodes>
+  <notes />
+  <edges>
+    <edge source="6fc7fc5e-9711-452e-a350-1503a10b01d0.TABLE:G223_B_BD2.echantillon" target="6fc7fc5e-9711-452e-a350-1503a10b01d0.TABLE:G223_B_BD2.personne">
+      <point x="0.0" y="-47.0" />
+      <point x="95.0" y="119.0" />
+      <point x="170.25" y="119.0" />
+      <point x="-31.75" y="47.0" />
+    </edge>
+    <edge source="6fc7fc5e-9711-452e-a350-1503a10b01d0.TABLE:G223_B_BD2.morceau" target="6fc7fc5e-9711-452e-a350-1503a10b01d0.TABLE:G223_B_BD2.echantillon">
+      <point x="0.0" y="-47.0" />
+      <point x="0.0" y="47.0" />
+    </edge>
+    <edge source="6fc7fc5e-9711-452e-a350-1503a10b01d0.TABLE:G223_B_BD2.entree" target="6fc7fc5e-9711-452e-a350-1503a10b01d0.TABLE:G223_B_BD2.personne">
+      <point x="0.0" y="-58.0" />
+      <point x="309.0" y="119.0" />
+      <point x="233.75" y="119.0" />
+      <point x="31.75" y="47.0" />
+    </edge>
+  </edges>
+  <settings layout="Hierarchic Group" zoom="1.0" x="357.5" y="123.5" />
+  <SelectedNodes>
+    <node>6fc7fc5e-9711-452e-a350-1503a10b01d0.TABLE:G223_B_BD2.personne</node>
+    <node>6fc7fc5e-9711-452e-a350-1503a10b01d0.TABLE:G223_B_BD2.echantillon</node>
+    <node>6fc7fc5e-9711-452e-a350-1503a10b01d0.TABLE:G223_B_BD2.morceau</node>
+    <node>6fc7fc5e-9711-452e-a350-1503a10b01d0.TABLE:G223_B_BD2.entree</node>
+  </SelectedNodes>
+  <Categories>
+    <Category>Key columns</Category>
+    <Category>Columns</Category>
+  </Categories>
+</Diagram>
+

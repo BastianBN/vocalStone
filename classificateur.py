@@ -12,6 +12,7 @@ from scipy.io.wavfile import *
 from scipy.signal.windows import hamming
 from sklearn import metrics
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
 
 from bdd import *
 
@@ -45,8 +46,8 @@ def transformation_coefs(coefs: list)->list:
     return mfcc(coefs, 9000)[0]
 
 
-modele_qui_predit = KNeighborsClassifier
-#modele_qui_predit=DecisionTreeClassifier
+#modele_qui_predit = KNeighborsClassifier
+modele_qui_predit=DecisionTreeClassifier
 
 
 class BaseDetecteur():
@@ -156,7 +157,6 @@ class BaseDetecteur():
                     raise IndexError
                 else:
                     pass  # le programme a juste pas fait beaucoup de choix différents
-        print(probas)
         classe_elue_n = comptage.argmax()
         classe_elue = self.labels_dict[classe_elue_n]
         if probas[classe_elue] > 60:
@@ -165,13 +165,14 @@ class BaseDetecteur():
             return self.labels_dict[0], probas
 
     def predire_classe_texte(self, coefs_fft, dirN=None, verbose=False) -> str:
-        classe = self.predire_classe(coefs_fft, dirN, verbose)
-        print(classe)
-        return self.labels[classe]
+        classe, probas = self.predire_classe_probas(coefs_fft, dirN, verbose)
+        return classe
 
     def autoriser_personne_probas(self, coefs_fft):#->Tuple[str, dict, bool]:
         classe, probas = self.predire_classe_probas(coefs_fft)
         return classe, probas, (classe in self.classes_autorisees)
+
+
 class DetecteurDeVoix(BaseDetecteur):
     # bdd:Database = None
     # def __init__(self, fichier_modele=None, modele=None,
@@ -240,11 +241,6 @@ class DetecteurDeVoix(BaseDetecteur):
                         self.ajouter_echantillon_bdd(coefs_fft, personne=personne, nom_echantillon=fichier)
             except NotADirectoryError:
                 pass
-
-    def predire_classe_texte(self, coefs_fft, dirN=None, verbose=False) -> str:
-        classe = self.predire_classe(coefs_fft, dirN, verbose)
-        # print(classe)
-        return self.labels_dict[classe]
 
 
 class TestP2I(BaseDetecteur):  # classe héritée pour les tests
