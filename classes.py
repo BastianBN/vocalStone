@@ -26,6 +26,7 @@ class P2I(object):
     serial_port: serial.Serial
     ml: DetecteurDeVoix
 
+    graph_change=False
     def __init__(self):
         self.setup_serial()
         self.lancer_reconnaissance_vocale()
@@ -76,6 +77,7 @@ class P2I(object):
         while self.reconnaissance_active:
             ligne = self.serial_port.readline().replace(b'\r\n', b'')
             if ligne == b'restart':
+                self.waterfall, self.waterfall_index = [], 0
                 print("Remise à zéro des tableaux, parlez maintenant")
                 self.coefs_ffts = []
                 morceau_fft = []
@@ -104,6 +106,7 @@ class P2I(object):
                             else:
                                 self.waterfall_index += 1
                             self.waterfall[self.waterfall_index] = fft_array
+                        self.graph_change = True
                     else:
                         print(fft_array.max())
                 else:
@@ -191,15 +194,17 @@ class P2I(object):
                     pass
             print("Fin enregistrement")
             callback()
-    #    self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)  # A tk.DrawingArea.
-    #    self.canvas.draw()
-    #    self.canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
+
+    def plot_mfcc(self, coefs_fft):
+        l = []
+        for coefs in coefs_fft:
+            self.add_plot(np.linspace(1, 13, 13), mfcc(coefs, 9000)[0])
 
 
 class GUI(P2I, tkinter.Tk):  # héritage multiple :)
     morceau_fft = []
     reconnaissance_active = True
-
+    axes=None
     def __init__(self, *args, **kwargs):
         tkinter.Tk.__init__(self, *args, **kwargs)
         self.title("Reconnaissance vocale GUI")
@@ -269,7 +274,7 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
         self.add_plot(X, Y, *args, **kwargs)
 
     def setup_matplotlib_figure(self):
-        self.fig = Figure(figsize=(3, 4), dpi=120)
+        self.fig = Figure(figsize=(5,3), dpi=120)
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)  # A tk.DrawingArea.
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
@@ -351,11 +356,14 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
         self.after(1500, self.reset_graph_loop)
 
     def afficher_waterfall(self):
-        self.fig.clear()
-        self.fig.add_subplot(111).matshow(np.array(self.waterfall))
-        self.canvas.draw()
-        self.graph_frame.update()
-        self.after(50, self.afficher_waterfall)
+        if self.graph_change:
+            self.fig.clear()
+            # self.fig.add_subplot(111).matshow(np.array(self.waterfall))
+            self.plot_mfcc(self.waterfall)
+            self.canvas.draw()
+            self.graph_frame.update()
+            self.graph_change = not self.graph_change
+        self.after(300, self.afficher_waterfall)
 
     def enregistrer_echantillon(self):
         self.coefs_ffts = []
@@ -526,12 +534,11 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
         nom_aff = tkinter.Label(master=fenetre, text=nom)
         nom_aff.pack(fill=tkinter.BOTH)
         fig = Figure(figsize=(5, 4), dpi=100)
-        fig.add_subplot(111).matshow(coefs_fft)
+        for coefs in coefs_fft:
+            fig.add_subplot(111).add_plot(np.linspace(1, 13, 13), mfcc(coefs, 9000)[0])
+        #fig.add_subplot(111).matshow(coefs_fft)
         canvas = FigureCanvasTkAgg(fig, master=fenetre)  # A tk.DrawingArea.
         canvas.draw()
         canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
         canvas.draw()
-
-
 # s = P2I() #test terminal
-
