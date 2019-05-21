@@ -13,8 +13,15 @@
         <property name="characterEncoding" value="utf8" />
         <property name="characterSetResults" value="utf8" />
         <property name="yearIsDateType" value="false" />
+        <property name="serverTimezone" value="Europe/Paris" />
       </driver-properties>
       <time-zone>Europe/Paris</time-zone>
+    </data-source>
+    <data-source source="LOCAL" name="vps psql" uuid="e9ad75c1-980e-4183-9633-1961ab586365">
+      <driver-ref>postgresql</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.postgresql.Driver</jdbc-driver>
+      <jdbc-url>jdbc:postgresql://vps.ribes.ovh:5432/p2i</jdbc-url>
     </data-source>
   </component>
 </project>
