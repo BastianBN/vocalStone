@@ -2,7 +2,7 @@ import os
 import pickle
 import re
 import time
-from typing import List
+from typing import List, Union
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -40,13 +40,15 @@ def wav_coefs_morceaux(nom_fichier: str, N: int = N, T: float = 0.01) -> List[Li
     return coefs
 
 
-def transformation_coefs(coefs: list)->list:
-    #return coefs
+def transformation_coefs(coefs: list) -> list:
+    # return coefs
     return mfcc(coefs, 9000)[0]
 
 
 modele_qui_predit = KNeighborsClassifier
-#modele_qui_predit=DecisionTreeClassifier
+
+
+# modele_qui_predit=DecisionTreeClassifier
 
 
 class BaseDetecteur():
@@ -66,7 +68,7 @@ class BaseDetecteur():
     labels_dict = {0: 'silence'}  # {1:"random", 2: "ljklkj" ...}
     labels_reverse = {'silence': 0}  # {'random':1, 'lkjlkj':2 ... }
 
-    classes_autorisees = ['jean'] #les gens dedans vont être autorisées pas le système
+    classes_autorisees = ['jean']  # les gens dedans vont être autorisées pas le système
 
     def __init__(self,
                  fichier_modele=None,
@@ -125,7 +127,8 @@ class BaseDetecteur():
                 pass
         self.modele.fit(self.Xlearn, self.Ylearn)
 
-    def predire_classe_probas(self, coefs_fft, dirN=None, verbose=False):  # ->Tuple[int, dict]:
+    def predire_classe_probas(self, coefs_fft, dirN=None, verbose=False):
+        # type: (np.array, Union[str, None], bool) -> Tuple[int, dict]
         Xtest, Ytest = [], []
         for coefs in np.abs(coefs_fft):
             Xtest.append(transformation_coefs(coefs))
@@ -169,21 +172,17 @@ class BaseDetecteur():
         print(classe)
         return self.labels[classe]
 
-    def autoriser_personne_probas(self, coefs_fft):#->Tuple[str, dict, bool]:
+    def autoriser_personne_probas(self, coefs_fft):
+        # type: (dict) -> Tuple[str, dict, bool]
         classe, probas = self.predire_classe_probas(coefs_fft)
         return classe, probas, (classe in self.classes_autorisees)
+
+
 class DetecteurDeVoix(BaseDetecteur):
-    # bdd:Database = None
-    # def __init__(self, fichier_modele=None, modele=None,
-    #             dossier_apprentissage="echantillons-learn", dossier_test="echantillons-test", N=128, T=0.1,
-    #             bdd=MySQLDatabase('G223_B_BD2', user='G223_B', password='G223_B', host='pc-tp-mysql.insa-lyon.fr', port=3306)
-    #             ):
-    #    self.bdd = bdd
-    #    super(BaseDetecteur).__init__(fichier_modele, modele, dossier_apprentissage, dossier_test, N, T)
 
     def __init__(self, **kwargs):
         try:
-            self.classes_autorisees=[] #on annule l'attribut hérité
+            self.classes_autorisees = []  # on annule l'attribut hérité
             for personne in Personne.select():
                 self.labels_dict[personne.id] = personne.nom
                 self.labels_reverse[personne.nom] = personne.id

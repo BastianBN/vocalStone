@@ -1,3 +1,4 @@
+from datetime import datetime
 from io import BytesIO
 
 import numpy
@@ -6,6 +7,11 @@ from peewee import *
 maBDD = MySQLDatabase('G223_B_BD2', user='G223_B', password='G223_B', host='pc-tp-mysql.insa-lyon.fr', port=3306)
 #bdd = PostgresqlDatabase('p2i', user='p2i', password='wheatstone', host='vps.ribes.ovh', port=5432)
 maBDD.connect()
+
+#import logging
+#logger = logging.getLogger('peewee')
+#logger.addHandler(logging.StreamHandler())
+#logger.setLevel(logging.DEBUG)
 
 class Personne(Model):
     class Meta:
@@ -49,6 +55,12 @@ class Morceau(Model):
         with BytesIO() as b:
             numpy.save(b, coefs)
             self._coefs = b.getvalue()
+class Entree(Model):
+    class Meta:
+        database = maBDD
+    personne = ForeignKeyField(Personne, backref='historique')
+    horodatage = DateTimeField(default=datetime.now) #pas besoin de le remplir du coup
+    pourcentage_confiance = IntegerField() #entre 0 et 100
 
 #maBDD.create_tables([Personne, Echantillon, Morceau])
 #jean = Personne.select().where(Personne.nom == "Jean").get() #jean = Personne.create(nom="Jean")
@@ -71,3 +83,9 @@ class Morceau(Model):
 #select p.nom, e.nom_echantillon, count(m.id) from personne as p, echantillon as e, morceau as m where m.echantillon_id = e.id and e.personne_id = p.id group by m.echantillon_id;
 
 # select p.nom, count(e.id) from personne as p, echantillon as e where e.personne_id = p.id group by p.id;
+
+def enregistrer_entree_historique(classe_pred:str, probas:dict, autorise:bool):
+    pers = Personne.get(Personne.nom==classe_pred)
+    if autorise:
+        Entree.create(personne=pers, pourcentage_confiance=probas[classe_pred])
+    return classe_pred, probas, autorise
