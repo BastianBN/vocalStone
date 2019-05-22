@@ -10,7 +10,6 @@ import serial
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from serial.tools import list_ports
-from matplotlib import pyplot as plt
 
 from classificateur import *
 
@@ -120,6 +119,8 @@ class P2I(object):
                         classe_pred, probas, autorise = self.ml.autoriser_personne_probas(self.donnees)
                         if autorise:
                             self.serial_port.write(1)
+                            pers = Personne.get(Personne.nom == classe_pred)
+                            Entree.create(personne=pers, pourcentage_confiance=probas[classe_pred]) #on enregistre le passage de la personne
                         self.afficher_nom(classe_pred, autorise)
                         self.afficher_probas(probas)
                         # if classe_pred in classes_valides:
@@ -196,9 +197,8 @@ class P2I(object):
             callback()
 
     def plot_mfcc(self, coefs_fft):
-        l = []
         for coefs in coefs_fft:
-            self.add_plot(np.linspace(1, 13, 13), mfcc(coefs, 9000)[0])
+            self.add_plot(np.linspace(1, 13, 13), mfcc(coefs, freq_ech)[0])
 
 
 class GUI(P2I, tkinter.Tk):  # héritage multiple :)

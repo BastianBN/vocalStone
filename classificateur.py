@@ -12,11 +12,10 @@ from scipy.io.wavfile import *
 from scipy.signal.windows import hamming
 from sklearn import metrics
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.tree import DecisionTreeClassifier
 
 from bdd import *
 
-freq_ech = 20000
+freq_ech = 9000
 N = 64 * 2  # nombre de coefficients par échantillon, il faut multiplier par 2 à cause de la moitié négative
 
 
@@ -43,7 +42,7 @@ def wav_coefs_morceaux(nom_fichier: str, N: int = N, T: float = 0.01) -> List[Li
 
 def transformation_coefs(coefs: list) -> list:
     # return coefs
-    return mfcc(coefs, 9000)[0]
+    return mfcc(coefs, freq_ech)[0]
 
 
 modele_qui_predit = KNeighborsClassifier
