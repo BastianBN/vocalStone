@@ -1,7 +1,17 @@
+#include <MCP3008.h>
+ 
+//define pin connections
+#define CS_PIN 12
+#define CLOCK_PIN 9
+#define MOSI_PIN 11
+#define MISO_PIN 10
+ 
+MCP3008 adc(CLOCK_PIN, MOSI_PIN, MISO_PIN, CS_PIN);
+
 #include "arduinoFFT.h"
  
 #define SAMPLES 128             //Must be a power of 2
-#define SAMPLING_FREQUENCY 10000 //Hz, must be less than 10000 due to ADC
+#define SAMPLING_FREQUENCY 48000 //Hz, must be less than 10000 due to ADC
  
 arduinoFFT FFT = arduinoFFT();
  
@@ -12,6 +22,7 @@ double vReal[SAMPLES];
 double vImag[SAMPLES];
  
 void setup() {
+    //Serial.begin(230400);// 
     Serial.begin(115200);
  
     sampling_period_us = round(1000000*(1.0/SAMPLING_FREQUENCY));
@@ -26,7 +37,8 @@ void loop() {
     {
         microseconds = micros();    //Overflows after around 70 minutes!
      
-        vReal[i] = analogRead(0);
+        //vReal[i] = analogRead(0);
+        vReal[i]=adc.readADC(0);
         vImag[i] = 0;
      
         while(micros() < (microseconds + sampling_period_us)){
@@ -44,17 +56,19 @@ void loop() {
    //Print out what frequency is the most dominant.
   //  Serial.println("0 0");
   Serial.println("begin");
-    for(int i=2; i<(SAMPLES/2)+2; i++)
+Serial.println(1000);
+    for(int i=2; i<(SAMPLES/2)-1; i++)
     {
         /*View all these three lines in serial terminal to see which frequencies has which amplitudes*/
          
         //Serial.print((i * 1.0 * SAMPLING_FREQUENCY) / SAMPLES, 1);
         //Serial.print(" ");
+      //  Serial.println(0);
         Serial.println(vReal[i], 1);    //View only this line in serial plotter to visualize the bins
-     //   Serial.println(0);
+      //  Serial.println(0);
     }
     Serial.println("end");
-    if(Serial.available()>0){
+
       /*int incomingB = Serial.read();
       if (incomingB==1) {*/
         digitalWrite(13, HIGH);
@@ -65,4 +79,4 @@ void loop() {
  
    /* delay(2000);  //Repeat the process every second OR:
     for(int i=0;i<100;i++){Serial.println(0);}*/
-}
+
