@@ -75,6 +75,7 @@ class P2I(object):
         self.coefs_ffts = []
         while self.reconnaissance_active:
             ligne = self.serial_port.readline().replace(b'\r\n', b'')
+            print(ligne, end=" ; ")
             if ligne == b'restart':
                 self.waterfall, self.waterfall_index = [], 0
                 print("Remise à zéro des tableaux, parlez maintenant")
@@ -89,14 +90,16 @@ class P2I(object):
             try:
                 nombre = float(ligne.decode('utf-8'))
                 if ligne != 'end' and morceau_fft is not None:
-                    morceau_fft.append(nombre)
+                    morceau_fft.append(nombre/100)
             except (UnicodeDecodeError, ValueError):
                 pass
             if ligne == b'end' and morceau_fft is not None:
-                if len(morceau_fft) == 64:
+                print("\nlongeur: {}".format(len(morceau_fft)))
+                if len(morceau_fft) == 62:
                     fft_array = np.array(morceau_fft)
-                    if fft_array.max() > SEUIL_DETECTION:
+                    if fft_array.max() > 1:#SEUIL_DETECTION:
                         self.coefs_ffts.append(fft_array)
+                        print("nouveau morceau dans coefs_ffts")
                         if len(self.waterfall) <= NOMBRE_FFT_RECONNAISSANCE:
                             self.waterfall.append(fft_array)
                         else:
@@ -109,12 +112,14 @@ class P2I(object):
                     else:
                         print(fft_array.max())
                 else:
+                    print("erreur de taille"+str(len(morceau_fft)))
                     morceau_fft = None
                     continue
                 if len(
                         self.coefs_ffts) > NOMBRE_FFT_RECONNAISSANCE:  # on attend d'avoir quelques échantillons pour éviter de valier un seul faux positif
                     self.donnees = np.array(self.coefs_ffts)
-                    if self.donnees.max() > 900:
+                    if self.donnees.max() > 1:#900:
+                        print("prédiction")
                         # classe_pred, probas = ml.predire_classe_probas(self.donnees)
                         classe_pred, probas, autorise = self.ml.autoriser_personne_probas(self.donnees)
                         if autorise:
@@ -131,11 +136,77 @@ class P2I(object):
                     else:
                         print("le maximum d'amplitude est inférieur à 900, on considère que personne n'a parlé")
                 morceau_fft = None  # pour bien faire sortir les erreurs
+    def analyse_detection(self, donnees):
+        print("prédiction")
+        # classe_pred, probas = ml.predire_classe_probas(self.donnees)
+        classe_pred, probas, autorise = self.ml.autoriser_personne_probas(donnees)
+        if autorise:
+            self.serial_port.write(1)
+            pers = Personne.get(Personne.nom == classe_pred)
+            Entree.create(personne=pers,
+                          pourcentage_confiance=probas[classe_pred])  # on enregistre le passage de la personne
+        self.afficher_nom(classe_pred, autorise)
+        self.afficher_probas(probas)
+
+
+    def read_serial(self, analyse: Callable, repeter=True):
+        morceau_fft = None
+        self.coefs_ffts = []
+        loop=True
+        while self.reconnaissance_active and loop:
+            ligne = self.serial_port.readline().replace(b'\r\n', b'')
+            print(ligne, end=" ; ")
+            if ligne == b'restart':
+                self.waterfall, self.waterfall_index = [], 0
+                print("Remise à zéro des tableaux, parlez maintenant")
+                self.coefs_ffts = []
+                morceau_fft = []
+                continue
+            if ligne == b"begin":
+                morceau_fft = []  # une transformée de Fourier
+                continue
+            # if ligne != b'end' and ligne != b'begin' and ligne !=b'\n' and ligne != b'' and ligne != b'restart' and morceau_fft is not None:
+            # print(ligne)
+            try:
+                nombre = float(ligne.decode('utf-8'))
+                if ligne != 'end' and morceau_fft is not None:
+                    morceau_fft.append(nombre/100)
+            except (UnicodeDecodeError, ValueError):
+                pass
+            if ligne == b'end' and morceau_fft is not None:
+                print("\nlongeur: {}".format(len(morceau_fft)))
+                if len(morceau_fft) == 62:
+                    fft_array = np.array(morceau_fft)
+                    if fft_array.max() > 1:#SEUIL_DETECTION:
+                        self.coefs_ffts.append(fft_array)
+                        print("nouveau morceau dans coefs_ffts")
+                        if len(self.waterfall) <= NOMBRE_FFT_RECONNAISSANCE:
+                            self.waterfall.append(fft_array)
+                        else:
+                            if self.waterfall_index >= len(self.waterfall) - 1:
+                                self.waterfall_index = 0
+                            else:
+                                self.waterfall_index += 1
+                            self.waterfall[self.waterfall_index] = fft_array
+                        self.graph_change = True
+                    else:
+                        print(fft_array.max())
+                else:
+                    print("erreur de taille"+str(len(morceau_fft)))
+                    morceau_fft = None
+                    continue
+                if len(
+                        self.coefs_ffts) > NOMBRE_FFT_RECONNAISSANCE:  # on attend d'avoir quelques échantillons pour éviter de valier un seul faux positif
+                    self.donnees = np.array(self.coefs_ffts)
+                    analyse(self.donnees)
+                    self.coefs_ffts=[]
+                morceau_fft = None  # pour bien faire sortir les erreurs
+            loop=repeter#pour finir la boucle si pas besoin de repeter
 
     def stop_reconnaissance_vocale(self):
         self.reconnaissance_active = False
 
-    def afficher_waterfall(self):
+    def afficher_graphique(self):
         plt.matshow(self.waterfall)
 
     def setup_serial(self):
@@ -196,10 +267,20 @@ class P2I(object):
             print("Fin enregistrement")
             callback()
 
-    def plot_mfcc(self, coefs_fft):
+    def lancer_enregistrement2(self, callback: Optional[Callable]):
+        morceau_fft = None
+        self.coefs_ffts = []
+        def analyse(donnees):
+            self.coefs_ffts=donnees
+        if self.serial_port.isOpen():
+            print("Début enregistrement")
+            self.read_serial(analyse)
+            print("Fin enregistrement")
+            callback()
+
+    def plot_mfcc_fft(self, coefs_fft):
         for coefs in coefs_fft:
             self.add_plot(np.linspace(1, 13, 13), mfcc(coefs, freq_ech)[0])
-
 
 class GUI(P2I, tkinter.Tk):  # héritage multiple :)
     morceau_fft = []
@@ -317,11 +398,11 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
         print("ml")
         if self.serial_port is not None:
             if self.serial_port.isOpen():
-
                 t = threading.Thread(target=self.reconnaitre_voix)
                 self.reconnaissance_active = True
                 t.start()
-                self.after(300, self.afficher_waterfall)
+                self.after(300, self.afficher_graphique)
+                self.after(5000, self.reset_graph_loop)
                 # self.after(1000, self.afficher_fft_realtime)
             # self.after(2000, self.reset_graph_loop)
             else:
@@ -332,38 +413,19 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
     def stop_reconnaissance_vocale(self):
         self.reconnaissance_active = False
 
-    def afficher_fft_realtime(self):
-        if self.donnees is not None:
-            # self.fig.clear()
-
-            # self.coefs_fft_mean[63]=100
-            # self.plot_fft(self.coefs_fft_mean)
-            # to_display=[]
-            # for ffts in np.array(self.fft_time_series).transpose():
-            #    to_display.append(np.mean(ffts))
-            # to_display = [np.mean(ffts) for ffts in np.array(self.fft_time_series).transpose()]
-            # to_display[63]=100
-            # self.plot_fft(to_display)
-
-            # self.morceau_fft[63] = 100
-            self.plot_fft(self.morceau_fft)
-            self.fig.clear()
-
-            self.after(100, self.afficher_fft_realtime)
-
-    def reset_graph_loop(self):
-        self.fig.clear()
-        self.after(1500, self.reset_graph_loop)
-
-    def afficher_waterfall(self):
-        if self.graph_change:
-            self.fig.clear()
-            # self.fig.add_subplot(111).matshow(np.array(self.waterfall))
-            self.plot_mfcc(self.waterfall)
-            self.canvas.draw()
-            self.graph_frame.update()
-            self.graph_change = not self.graph_change
-        self.after(300, self.afficher_waterfall)
+    def afficher_graphique(self):
+        if self.donnees is None:
+            return
+        for coefs in mfcc(self.donnees, freq_ech):
+            self.add_plot(np.linspace(1, 13, 13), coefs)
+        #if self.graph_change:
+        #    self.fig.clear()
+        #    # self.fig.add_subplot(111).matshow(np.array(self.waterfall))
+        #    self.plot_mfcc(self.waterfall)
+        #    self.canvas.draw()
+        #    self.graph_frame.update()
+        #    self.graph_change = not self.graph_change
+        self.after(300, self.afficher_graphique)
 
     def enregistrer_echantillon(self):
         self.coefs_ffts = []
@@ -508,6 +570,9 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
                 coefs_fft.append(morceau.coefs)
             self.voir_matrice_ffts(np.array(coefs_fft), echantilon.personne.nom)
 
+            self.donnees=coefs_fft
+            self.afficher_graphique()
+
         bouton_voir_mat = tkinter.Button(master=fenetre, text="Voir matrice FFT", command=afficher_ech_mat)
         bouton_voir_mat.pack()
 
@@ -535,10 +600,60 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
         nom_aff.pack(fill=tkinter.BOTH)
         fig = Figure(figsize=(5, 4), dpi=100)
         for coefs in coefs_fft:
-            fig.add_subplot(111).add_plot(np.linspace(1, 13, 13), mfcc(coefs, 9000)[0])
+            fig.add_subplot(111).add_plot(np.linspace(1, 13, 13), mfcc(coefs, freq_ech)[0])
         #fig.add_subplot(111).matshow(coefs_fft)
         canvas = FigureCanvasTkAgg(fig, master=fenetre)  # A tk.DrawingArea.
         canvas.draw()
         canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
         canvas.draw()
 # s = P2I() #test terminal
+
+    def reset_graph_loop(self):
+        self.reset_graph()
+        self.after(3000, self.reset_graph_loop)
+
+class TestMFCC(P2I):
+    def __init__(self):
+        self.setup_serial()
+        self.read_serial()
+
+    def read_serial(self):
+        morceau_fft = None
+        self.coefs_ffts = []
+        while self.reconnaissance_active:
+            ligne = self.serial_port.readline().replace(b'\r\n', b'')
+            print(ligne, end=" ; ")
+            if ligne == b'restart':
+                self.waterfall, self.waterfall_index = [], 0
+                print("Remise à zéro des tableaux, parlez maintenant")
+                self.coefs_ffts = []
+                morceau_fft = []
+                continue
+            if ligne == b"begin":
+                morceau_fft = []  # une transformée de Fourier
+                continue
+            # if ligne != b'end' and ligne != b'begin' and ligne !=b'\n' and ligne != b'' and ligne != b'restart' and morceau_fft is not None:
+            # print(ligne)
+            try:
+                nombre = float(ligne.decode('utf-8'))
+                if ligne != 'end' and morceau_fft is not None:
+                    morceau_fft.append(nombre/100)
+            except (UnicodeDecodeError, ValueError):
+                pass
+            if ligne == b'end' and morceau_fft is not None:
+                print("\nlongeur: {}".format(len(morceau_fft)))
+                if len(morceau_fft) == 62:
+                    fft_array = np.array(morceau_fft)
+                    self.coefs_ffts.append(fft_array)
+                else:
+                    print("erreur de taille"+str(len(morceau_fft)))
+                    morceau_fft = None
+                    continue
+                if len(
+                        self.coefs_ffts) > NOMBRE_FFT_RECONNAISSANCE:  # on attend d'avoir quelques échantillons pour éviter de valier un seul faux positif
+                    self.donnees = np.array(self.coefs_ffts)
+                    for y in mfcc(self.donnees, freq_ech):
+                        plt.plot(np.linspace(1,13,13),y)
+                        plt.show()
+                    self.coefs_ffts = []  # on reset
+                morceau_fft = None  # pour bien faire sortir les erreurs
