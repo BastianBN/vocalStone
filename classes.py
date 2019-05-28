@@ -148,7 +148,6 @@ class P2I(object):
         self.afficher_nom(classe_pred, autorise)
         self.afficher_probas(probas)
 
-
     def read_serial(self, analyse: Callable, repeter=True):
         morceau_fft = None
         self.coefs_ffts = []
@@ -200,8 +199,8 @@ class P2I(object):
                     self.donnees = np.array(self.coefs_ffts)
                     analyse(self.donnees)
                     self.coefs_ffts=[]
+                    loop = repeter  # pour finir la boucle si pas besoin de repeter
                 morceau_fft = None  # pour bien faire sortir les erreurs
-            loop=repeter#pour finir la boucle si pas besoin de repeter
 
     def stop_reconnaissance_vocale(self):
         self.reconnaissance_active = False
@@ -210,15 +209,15 @@ class P2I(object):
         plt.matshow(self.waterfall)
 
     def setup_serial(self):
-        ports = list_ports.comports()
-        for port in ports:
-            if "Arduino" in port.description:
-                print("Configuration de la carte {} branchée sur le port {}".format(port.description, port.device))
-                self.serial_port = serial.Serial(port=port.device, baudrate=115200, timeout=1, writeTimeout=1)
-                print(self.serial_port)
-                return None  # on sort de la boucle car on va pas configurer plusieurs ports série
-        print("Configuration automatique du port série échouée, essai de configuration manuelle")
         try:
+            ports = list_ports.comports()
+            for port in ports:
+                if "Arduino" in port.description:
+                    print("Configuration de la carte {} branchée sur le port {}".format(port.description, port.device))
+                    self.serial_port = serial.Serial(port=port.device, baudrate=115200, timeout=1, writeTimeout=1)
+                    print(self.serial_port)
+                    return None  # on sort de la boucle car on va pas configurer plusieurs ports série
+            print("Configuration automatique du port série échouée, essai de configuration manuelle")
             if platform.system() == 'Linux':  # Linux
                 self.serial_port = serial.Serial(port="/dev/ttyACM0", baudrate=115200, timeout=1, writeTimeout=1)
             elif platform.system() == 'Darwin':  # macOS
@@ -237,7 +236,7 @@ class P2I(object):
     def voir_matrice_ffts(self, coefs_fft: np.array, nom: str):
         plt.matshow(coefs_fft)
 
-    def lancer_enregistrement(self, callback: Optional[Callable]):
+    def lancer_enregistrementOLD(self, callback: Optional[Callable]):
         morceau_fft = None
         self.coefs_ffts = []
         if self.serial_port.isOpen():
@@ -267,16 +266,16 @@ class P2I(object):
             print("Fin enregistrement")
             callback()
 
-    def lancer_enregistrement2(self, callback: Optional[Callable]):
+    def lancer_enregistrement(self, callback: Optional[Callable]):
         morceau_fft = None
-        self.coefs_ffts = []
-        def analyse(donnees):
-            self.coefs_ffts=donnees
+        coefs_ffts = None
+        def analyse(donnees:list): #en fait on l'utilise pas
+            return None
         if self.serial_port.isOpen():
             print("Début enregistrement")
-            self.read_serial(analyse)
+            self.read_serial(analyse, repeter=False)
             print("Fin enregistrement")
-            callback()
+            callback(self.donnees)
 
     def plot_mfcc_fft(self, coefs_fft):
         for coefs in coefs_fft:
@@ -401,7 +400,7 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
                 t = threading.Thread(target=self.reconnaitre_voix)
                 self.reconnaissance_active = True
                 t.start()
-                self.after(300, self.afficher_graphique)
+                self.after(3000, self.afficher_graphique)
                 self.after(5000, self.reset_graph_loop)
                 # self.after(1000, self.afficher_fft_realtime)
             # self.after(2000, self.reset_graph_loop)
@@ -414,17 +413,16 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
         self.reconnaissance_active = False
 
     def afficher_graphique(self):
-        if self.donnees is None:
-            return
-        for coefs in mfcc(self.donnees, freq_ech):
-            self.add_plot(np.linspace(1, 13, 13), coefs)
-        #if self.graph_change:
-        #    self.fig.clear()
-        #    # self.fig.add_subplot(111).matshow(np.array(self.waterfall))
-        #    self.plot_mfcc(self.waterfall)
-        #    self.canvas.draw()
-        #    self.graph_frame.update()
-        #    self.graph_change = not self.graph_change
+  #      if self.donnees is None:
+  #          return
+  #      for coefs in mfcc(self.donnees, freq_ech):
+  #          self.add_plot(np.linspace(1, 13, 13), coefs)
+        if self.graph_change:
+            self.fig.clear()
+            self.fig.add_subplot(111).matshow(np.array(self.waterfall))
+            self.canvas.draw()
+            self.graph_frame.update()
+            self.graph_change = not self.graph_change
         self.after(300, self.afficher_graphique)
 
     def enregistrer_echantillon(self):
@@ -458,11 +456,11 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
         bouton_save = tkinter.Button(master=fenetre_rec, text="Ajouter à la BDD", command=handle_save, state='disabled')
         bouton_save.pack()
 
-        def handle_fin_rec():
+        def handle_fin_rec(coefs_ffts):
             print("finalisation enregistrement")
             progessbar.stop()
             bouton_save.configure(state='normal')
-            self.voir_matrice_ffts(np.array(self.coefs_ffts), nom="")
+            self.voir_matrice_ffts(np.array(coefs_ffts), nom="")
 
         def handle_rec():
             bouton_rec.configure(state='disabled')
@@ -599,9 +597,9 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
         nom_aff = tkinter.Label(master=fenetre, text=nom)
         nom_aff.pack(fill=tkinter.BOTH)
         fig = Figure(figsize=(5, 4), dpi=100)
-        for coefs in coefs_fft:
-            fig.add_subplot(111).add_plot(np.linspace(1, 13, 13), mfcc(coefs, freq_ech)[0])
-        #fig.add_subplot(111).matshow(coefs_fft)
+        #for coefs in coefs_fft:
+        #    fig.add_subplot(111).add_plot(np.linspace(1, 13, 13), mfcc(coefs, freq_ech)[0])
+        fig.add_subplot(111).matshow(coefs_fft)
         canvas = FigureCanvasTkAgg(fig, master=fenetre)  # A tk.DrawingArea.
         canvas.draw()
         canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)

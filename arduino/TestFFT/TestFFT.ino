@@ -64,7 +64,7 @@ Serial.println(1000);
         //Serial.print((i * 1.0 * SAMPLING_FREQUENCY) / SAMPLES, 1);
         //Serial.print(" ");
       //  Serial.println(0);
-        Serial.println(vReal[i], 1);    //View only this line in serial plotter to visualize the bins
+        Serial.println(vReal[i]*100, 1);    //View only this line in serial plotter to visualize the bins
       //  Serial.println(0);
     }
     Serial.println("end");

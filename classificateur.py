@@ -42,9 +42,12 @@ def wav_coefs_morceaux(nom_fichier: str, N: int = N, T: float = 0.01) -> List[Li
 
 
 def transformation_coefs(coefs: list) -> list:
-    # return coefs
-    return mfcc(coefs, freq_ech)[0]
-
+    return [coefs]
+    #return mfcc(coefs, freq_ech)[0]
+def utilisation_coefs(X:list, Y:list,  coefs:list, label:str=None,):
+    for liste in transformation_coefs(coefs):
+        X.append(liste) #au cas où on utilise les MFCC, il faut pouvoir itérer
+        if label is not None: Y.append(label)
 
 #modele_qui_predit = KNeighborsClassifier
 modele_qui_predit=DecisionTreeClassifier
@@ -116,8 +119,7 @@ class BaseDetecteur():
                         print(dos + "/" + fichier)
                         coefs_fft = wav_coefs_morceaux("{}/{}/{}".format(self.dossier_apprentissage, dos, fichier), N)
                         for coefs in np.abs(coefs_fft):
-                            self.Xlearn.append(transformation_coefs(coefs_fft))
-                            self.Ylearn.append(dirN)
+                            utilisation_coefs(self.Xlearn, self.Ylearn, coefs, label=dirN)
                 self.labels.append(dos)
                 self.labels_reverse[dirN] = dos
                 self.labels_dict[dos] = dirN
@@ -129,7 +131,9 @@ class BaseDetecteur():
     def predire_classe_probas(self, coefs_fft, dirN=None, verbose=False):
         # type: (np.array, Union[str, None], bool) -> Tuple[int, dict]
         Xtest, Ytest = [], []
-        for coefs in mfcc(coefs_fft):
+
+        for coefs in coefs_fft:# mfcc(coefs_fft):
+            utilisation_coefs(Xtest, Ytest, coefs, dirN)
             Xtest.append(coefs)
             if dirN is not None: Ytest.append(dirN)
 
@@ -200,11 +204,12 @@ class DetecteurDeVoix(BaseDetecteur):
             for echantillon in personne.echantillons:
                 print(echantillon.nom_echantillon)
                 for morceau in echantillon.morceaux:
-                    for coefs in mfcc(morceau.coefs, freq_ech):
-                        self.Xlearn.append(coefs)
-                        self.Ylearn.append(personne.id)
+                    #for coefs in mfcc(morceau.coefs, freq_ech):
+                    #    self.Xlearn.append(coefs)
+                    #    self.Ylearn.append(personne.id)
                     #self.Xlearn.append(transformation_coefs(morceau.coefs))
                     #self.Ylearn.append(personne.id)
+                    utilisation_coefs(self.Xlearn, self.Ylearn, morceau.coefs[:-2], label=personne.id)
             self.labels.append(personne.nom)
         self.modele.fit(self.Xlearn, self.Ylearn)
 
