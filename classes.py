@@ -196,14 +196,15 @@ class P2I(object):
                         print("\r[OUI]", end='')
                         self.coefs_ffts.append(fft_array)
                         print_debug("nouveau morceau dans coefs_ffts")
+                        array_pour_waterfall = transformation_coefs(fft_array)
                         if len(self.waterfall) <= NOMBRE_FFT_RECONNAISSANCE:
-                            self.waterfall.append(fft_array)
+                            self.waterfall.append(array_pour_waterfall)
                         else:
                             if self.waterfall_index >= len(self.waterfall) - 1:
                                 self.waterfall_index = 0
                             else:
                                 self.waterfall_index += 1
-                            self.waterfall[self.waterfall_index] = fft_array
+                            self.waterfall[self.waterfall_index] = array_pour_waterfall
                         self.graph_change = True
                     else:
                         print("\r[NON]", end='')

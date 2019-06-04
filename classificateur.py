@@ -4,20 +4,19 @@ import re
 import time
 from typing import List, Union
 
+import librosa
 import numpy as np
 from matplotlib import pyplot as plt
-from python_speech_features import mfcc
 from scipy.fftpack import fft
 from scipy.io.wavfile import *
 from scipy.signal.windows import hamming
 from sklearn import metrics
-from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 
 from bdd import *
 
 freq_ech = 20000
-N = 64 * 2  # nombre de coefficients par échantillon, il faut multiplier par 2 à cause de la moitié négative
+N = 62 * 2  # nombre de coefficients par échantillon, il faut multiplier par 2 à cause de la moitié négative
 
 
 # wav_file = re.compile('^.+wav$')
@@ -42,12 +41,17 @@ def wav_coefs_morceaux(nom_fichier: str, N: int = N, T: float = 0.01) -> List[Li
 
 
 def transformation_coefs(coefs: list) -> list:
-    return [coefs]
+    melspectr = librosa.feature.melspectrogram(S=coefs, n_fft=N, y=None)
+    mfcc = librosa.feature.mfcc(S=melspectr, y=None, n_mfcc=13)
+    return np.array(mfcc)
     #return mfcc(coefs, freq_ech)[0]
+
 def utilisation_coefs(X:list, Y:list,  coefs:list, label:str=None,):
-    for liste in transformation_coefs(coefs):
-        X.append(liste) #au cas où on utilise les MFCC, il faut pouvoir itérer
-        if label is not None: Y.append(label)
+    X.append(transformation_coefs(coefs))
+    if label is not None: Y.append(label)
+    #for liste in transformation_coefs(coefs):
+    #    X.append(liste) #au cas où on utilise les MFCC, il faut pouvoir itérer
+    #    if label is not None: Y.append(label)
 
 #modele_qui_predit = KNeighborsClassifier
 modele_qui_predit=DecisionTreeClassifier
@@ -132,9 +136,8 @@ class BaseDetecteur():
         # type: (np.array, Union[str, None], bool) -> Tuple[int, dict]
         Xtest, Ytest = [], []
 
-        for coefs in coefs_fft:# mfcc(coefs_fft):
-            utilisation_coefs(Xtest, Ytest, coefs, dirN)
-            Xtest.append(coefs)
+        for coefs in coefs_fft: # c'est une matrice
+            utilisation_coefs(Xtest, Ytest, coefs, dirN)  # Xtest est un vecteur ici
             if dirN is not None: Ytest.append(dirN)
 
         Ypred = self.modele.predict(Xtest)
@@ -203,7 +206,7 @@ class DetecteurDeVoix(BaseDetecteur):
             print(personne.nom + str(personne.id))
             for echantillon in personne.echantillons:
                 print(echantillon.nom_echantillon)
-                for morceau in echantillon.morceaux:
+                for morceau in echantillon.morceaux: #  un vecteur
                     #for coefs in mfcc(morceau.coefs, freq_ech):
                     #    self.Xlearn.append(coefs)
                     #    self.Ylearn.append(personne.id)
@@ -211,7 +214,9 @@ class DetecteurDeVoix(BaseDetecteur):
                     #self.Ylearn.append(personne.id)
                     utilisation_coefs(self.Xlearn, self.Ylearn, morceau.coefs, label=personne.id)
             self.labels.append(personne.nom)
-        self.modele.fit(self.Xlearn, self.Ylearn)
+        to_learn = np.array(self.Xlearn)
+        print(to_learn.shape)
+        self.modele.fit(to_learn, self.Ylearn)
 
     def ajouter_echantillon_bdd(self, coefs_fft, personne, nom_echantillon):
         # try:
