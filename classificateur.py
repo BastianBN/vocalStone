@@ -209,7 +209,7 @@ class DetecteurDeVoix(BaseDetecteur):
                     #    self.Ylearn.append(personne.id)
                     #self.Xlearn.append(transformation_coefs(morceau.coefs))
                     #self.Ylearn.append(personne.id)
-                    utilisation_coefs(self.Xlearn, self.Ylearn, morceau.coefs[:-2], label=personne.id)
+                    utilisation_coefs(self.Xlearn, self.Ylearn, morceau.coefs, label=personne.id)
             self.labels.append(personne.nom)
         self.modele.fit(self.Xlearn, self.Ylearn)
 

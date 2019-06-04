@@ -14,6 +14,7 @@ from serial.tools import list_ports
 from classificateur import *
 
 SEUIL_DETECTION = 500
+NOMBRE_FFT_ENREGISTREMENT = 30
 NOMBRE_FFT_RECONNAISSANCE = 10  # matrice de (x,64) coefficients de fourier
 VERBOSE = False  # pour afficher dans la console les données reçues
 
@@ -159,6 +160,10 @@ class P2I(object):
         self.afficher_probas(probas)
 
     def read_serial(self, analyse: Callable, repeter=True):
+        if repeter:
+            NOMBRE_FFT_REQUIS=NOMBRE_FFT_RECONNAISSANCE
+        else:
+            NOMBRE_FFT_REQUIS=NOMBRE_FFT_ENREGISTREMENT
         morceau_fft = None
         self.coefs_ffts = []
         loop = True
@@ -208,7 +213,7 @@ class P2I(object):
                     morceau_fft = None
                     continue
                 if len(
-                        self.coefs_ffts) > NOMBRE_FFT_RECONNAISSANCE:  # on attend d'avoir quelques échantillons pour éviter de valier un seul faux positif
+                        self.coefs_ffts) > NOMBRE_FFT_REQUIS:  # on attend d'avoir quelques échantillons pour éviter de valier un seul faux positif
                     self.donnees = np.array(self.coefs_ffts)
                     analyse(self.donnees)
                     self.coefs_ffts = []
@@ -439,6 +444,7 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
 
     def enregistrer_echantillon(self):
         self.coefs_ffts = []
+        self.reconnaissance_active=False #pour arrêter la reconnaisance avant l'enregistrement
         fenetre_rec = tkinter.Toplevel()
         fenetre_rec.title("Enregistrement d'un nouvel échantillon")
         fenetre_rec.pack_propagate()
@@ -468,11 +474,13 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
         bouton_save = tkinter.Button(master=fenetre_rec, text="Ajouter à la BDD", command=handle_save, state='disabled')
         bouton_save.pack()
 
-        def handle_fin_rec(coefs_ffts):
+        def handle_fin_rec(coefs_ffts:np.array):
             print("finalisation enregistrement")
             progessbar.stop()
             bouton_save.configure(state='normal')
-            self.voir_matrice_ffts(np.array(coefs_ffts), nom="")
+            self.voir_matrice_ffts(coefs_ffts, nom="")
+            self.coefs_ffts = coefs_ffts.copy()
+            print("données copiées")
 
         def handle_rec():
             bouton_rec.configure(state='disabled')
@@ -652,7 +660,7 @@ class TestMFCC(P2I):
             except (UnicodeDecodeError, ValueError):
                 pass
             if ligne == b'end' and morceau_fft is not None:
-                print("\nlongeur: {}".format(len(morceau_fft)))
+                print_debug("\nlongeur: {}".format(len(morceau_fft)))
                 if len(morceau_fft) == 62:
                     fft_array = np.array(morceau_fft)
                     self.coefs_ffts.append(fft_array)
