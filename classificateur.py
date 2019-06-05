@@ -11,13 +11,14 @@ from scipy.fftpack import fft
 from scipy.io.wavfile import *
 from scipy.signal.windows import hamming
 from sklearn import metrics
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 
 from bdd import *
 
-freq_ech = 20000
+freq_ech = 10000
 N = 62 * 2  # nombre de coefficients par échantillon, il faut multiplier par 2 à cause de la moitié négative
-
+POURCENTAGE_AUTORISATION = 70
 
 # wav_file = re.compile('^.+wav$')
 # labels = []  #liste des répertoires
@@ -40,8 +41,8 @@ def wav_coefs_morceaux(nom_fichier: str, N: int = N, T: float = 0.01) -> List[Li
     return coefs
 
 
-def transformation_coefs(coefs: list) -> list:
-    melspectr = librosa.feature.melspectrogram(S=coefs, n_fft=N, y=None)
+def transformation_coefs(coefs: list) -> np.ndarray: #un vecteur de coefficients
+    melspectr = librosa.feature.melspectrogram(S=coefs, n_fft=N, y=None, sr=freq_ech)
     mfcc = librosa.feature.mfcc(S=melspectr, y=None, n_mfcc=13)
     return np.array(mfcc)
     #return mfcc(coefs, freq_ech)[0]
@@ -53,8 +54,8 @@ def utilisation_coefs(X:list, Y:list,  coefs:list, label:str=None,):
     #    X.append(liste) #au cas où on utilise les MFCC, il faut pouvoir itérer
     #    if label is not None: Y.append(label)
 
-#modele_qui_predit = KNeighborsClassifier
-modele_qui_predit=DecisionTreeClassifier
+modele_qui_predit = KNeighborsClassifier
+#modele_qui_predit=DecisionTreeClassifier
 
 
 class BaseDetecteur():
@@ -167,7 +168,7 @@ class BaseDetecteur():
                     pass  # le programme a juste pas fait beaucoup de choix différents
         classe_elue_n = comptage.argmax()
         classe_elue = self.labels_dict[classe_elue_n]
-        if probas[classe_elue] > 60:
+        if probas[classe_elue] > POURCENTAGE_AUTORISATION:
             return classe_elue, probas
         else:
             return self.labels_dict[0], probas
