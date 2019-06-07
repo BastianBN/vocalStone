@@ -20,6 +20,7 @@ freq_ech = 10000
 N = 62 * 2  # nombre de coefficients par échantillon, il faut multiplier par 2 à cause de la moitié négative
 POURCENTAGE_AUTORISATION = 70
 
+
 # wav_file = re.compile('^.+wav$')
 # labels = []  #liste des répertoires
 #
@@ -41,21 +42,25 @@ def wav_coefs_morceaux(nom_fichier: str, N: int = N, T: float = 0.01) -> List[Li
     return coefs
 
 
-def transformation_coefs(coefs: list) -> np.ndarray: #un vecteur de coefficients
+def transformation_coefs(coefs: list) -> np.ndarray:  # un vecteur de coefficients
     melspectr = librosa.feature.melspectrogram(S=coefs, n_fft=N, y=None, sr=freq_ech)
     mfcc = librosa.feature.mfcc(S=melspectr, y=None, n_mfcc=13)
     return np.array(mfcc)
-    #return mfcc(coefs, freq_ech)[0]
+    # return mfcc(coefs, freq_ech)[0]
 
-def utilisation_coefs(X:list, Y:list,  coefs:list, label:str=None,):
+
+def utilisation_coefs(X: list, Y: list, coefs: list, label: str = None, ):
     X.append(transformation_coefs(coefs))
     if label is not None: Y.append(label)
-    #for liste in transformation_coefs(coefs):
+    # for liste in transformation_coefs(coefs):
     #    X.append(liste) #au cas où on utilise les MFCC, il faut pouvoir itérer
     #    if label is not None: Y.append(label)
 
+
 modele_qui_predit = KNeighborsClassifier
-#modele_qui_predit=DecisionTreeClassifier
+
+
+# modele_qui_predit=DecisionTreeClassifier
 
 
 class BaseDetecteur():
@@ -137,7 +142,7 @@ class BaseDetecteur():
         # type: (np.array, Union[str, None], bool) -> Tuple[int, dict]
         Xtest, Ytest = [], []
 
-        for coefs in coefs_fft: # c'est une matrice
+        for coefs in coefs_fft:  # c'est une matrice
             utilisation_coefs(Xtest, Ytest, coefs, dirN)  # Xtest est un vecteur ici
             if dirN is not None: Ytest.append(dirN)
 
@@ -207,12 +212,12 @@ class DetecteurDeVoix(BaseDetecteur):
             print(personne.nom + str(personne.id))
             for echantillon in personne.echantillons:
                 print(echantillon.nom_echantillon)
-                for morceau in echantillon.morceaux: #  un vecteur
-                    #for coefs in mfcc(morceau.coefs, freq_ech):
+                for morceau in echantillon.morceaux:  # un vecteur
+                    # for coefs in mfcc(morceau.coefs, freq_ech):
                     #    self.Xlearn.append(coefs)
                     #    self.Ylearn.append(personne.id)
-                    #self.Xlearn.append(transformation_coefs(morceau.coefs))
-                    #self.Ylearn.append(personne.id)
+                    # self.Xlearn.append(transformation_coefs(morceau.coefs))
+                    # self.Ylearn.append(personne.id)
                     utilisation_coefs(self.Xlearn, self.Ylearn, morceau.coefs, label=personne.id)
             self.labels.append(personne.nom)
         to_learn = np.array(self.Xlearn)
@@ -295,8 +300,46 @@ class TestP2I(BaseDetecteur):  # classe héritée pour les tests
         print(mc)
         plt.show()
 
+
 # p2i = TestP2I()
 # p2i.test_confusion()
 # print(p2i.labels_dict)
 # p2i.confusion_globale()
 # print(p2i.predire_classe_texte(wav_coefs_morceaux("bonjour p2i/jean/1.wav", 128*2)))
+
+def inverse_fft(coefs_fft: np.array):  # matrice
+    return np.reshape(np.fft.irfft(coefs_fft).transpose()[0:61], -1)
+
+
+def audio_personne(nom: str):
+    mat_audio = []
+    for ech in Personne.get(Personne.nom == nom).echantillons:
+        coefs_mat = []
+        for morceau in ech.morceaux:
+            coefs_mat.append(morceau.coefs)
+        mat_audio.append(inverse_fft(coefs_mat))
+    audio_long = np.reshape(mat_audio, -1)
+    print(audio_long.shape)
+    import sounddevice
+    sounddevice.play(audio_long, 10000)
+
+
+def audio(nom: str, fe: int = 10000):
+    mat = []  # (n,n)
+    for ech in Personne.get(Personne.nom == nom).echantillons:
+        for morceau in ech.morceaux:
+            mat.append(morceau.coefs)
+    audio_long = np.reshape(np.fft.irfft(mat).transpose()[0:61].transpose(), -1)
+    print(audio_long.shape)
+    import sounddevice
+    sounddevice.play(audio_long, fe)
+
+
+def play_morceau(mat, n=3, fe=5500):
+    long = mat
+    i = 0
+    while i < n:
+        long=np.concatenate((long, mat))
+        i+=1
+    import sounddevice
+    sounddevice.play(np.reshape(np.fft.irfft(long).transpose()[0:61].transpose(), -1), fe)

@@ -542,6 +542,12 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
 
         bouton_autor = tkinter.Button(master=fenetre, text="Autoriser", command=autoriser)
         bouton_autor.pack(side=tkinter.LEFT)
+
+        def lire_personne():
+            personne = Personne.get(Personne.id == self.var_id_personne.get())
+            audio(personne.nom)
+        bouton_play = tkinter.Button(master=fenetre, text="Lire", command=lire_personne)
+        bouton_play.pack()
         fenetre.pack_slaves()
         fenetre.focus()
 
@@ -586,10 +592,10 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
 
         def afficher_ech_mat():
             echantilon: Echantillon = Echantillon.get(Echantillon.id == var_id_echantillon.get())
-            coefs_fft = []
-            for morceau in echantilon.morceaux:
-                coefs_fft.append(morceau.coefs)
-            self.voir_matrice_ffts(np.array(coefs_fft), echantilon.personne.nom)
+            #coefs_fft = []
+            #for morceau in echantilon.morceaux:
+            #    coefs_fft.append(morceau.coefs)
+            self.voir_matrice_ffts(echantilon.matrice, echantilon.personne.nom)
 
     #        self.donnees = coefs_fft
     #        self.afficher_graphique()
@@ -605,6 +611,12 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
         mfcc_bouton = tkinter.Button(master=fenetre, command=voir_mfcc, text="Voir MFCC")
         mfcc_bouton.pack()
 
+        def lire_echantillon():
+            echantilon: Echantillon = Echantillon.get(Echantillon.id == var_id_echantillon.get())
+            play_morceau(echantilon.matrice)
+
+        play_button = tkinter.Button(master=fenetre, command=lire_echantillon, text="Synthétiser l'Audio")
+        play_button.pack()
     def recap_bdd(self):
         fenetre = tkinter.Toplevel()
         tableau = ttk.Treeview(fenetre)
@@ -639,7 +651,10 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
             self.voir_matrice_mfcc(coefs_fft, nom)
         mfcc_bouton = tkinter.Button(master=fenetre, command=voir_mfcc, text="Voir MFCC")
         mfcc_bouton.pack()
-
+        def lire_echantillon():
+            play_morceau(coefs_fft)
+        play_button = tkinter.Button(master=fenetre, command=lire_echantillon, text="Synthétiser l'Audio")
+        play_button.pack()
     def reset_graph_loop(self):
         """Pas nécessaire pour le waterfall"""
         self.reset_graph()
