@@ -9,7 +9,6 @@ from typing import Optional, Callable
 import serial
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
-from peewee import RawQuery
 from serial.tools import list_ports
 
 from classificateur import *
@@ -162,9 +161,9 @@ class P2I(object):
 
     def read_serial(self, analyse: Callable, repeter=True):
         if repeter:
-            NOMBRE_FFT_REQUIS=NOMBRE_FFT_RECONNAISSANCE
+            NOMBRE_FFT_REQUIS = NOMBRE_FFT_RECONNAISSANCE
         else:
-            NOMBRE_FFT_REQUIS=NOMBRE_FFT_ENREGISTREMENT
+            NOMBRE_FFT_REQUIS = NOMBRE_FFT_ENREGISTREMENT
         morceau_fft = None
         self.coefs_ffts = []
         loop = True
@@ -338,7 +337,7 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
         self.bdd_menu.add_command(label="Gérer", command=self.gerer_bdd)
         self.bdd_menu.add_command(label="Enregistrer un locuteur", command=self.enregistrer_echantillon)
         self.bdd_menu.add_command(label="Récapitulatif", command=self.recap_bdd)
-        self.bdd_menu.add_command(label="Statistiques contrôle d'accès", command=self.stats_sql_historique)
+        self.bdd_menu.add_command(label="Statistiques contrôle d'accès avec noms", command=self.stats_sql_historique)
 
         self.serial_frame = tkinter.Frame(master=self)
         self.serial_frame.pack(fill=tkinter.BOTH)  # Conteneur pour les infos liées à la détéction des voix
@@ -447,7 +446,7 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
 
     def enregistrer_echantillon(self):
         self.coefs_ffts = []
-        self.reconnaissance_active=False #pour arrêter la reconnaisance avant l'enregistrement
+        self.reconnaissance_active = False  # pour arrêter la reconnaisance avant l'enregistrement
         fenetre_rec = tkinter.Toplevel()
         fenetre_rec.title("Enregistrement d'un nouvel échantillon")
         fenetre_rec.pack_propagate()
@@ -477,7 +476,7 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
         bouton_save = tkinter.Button(master=fenetre_rec, text="Ajouter à la BDD", command=handle_save, state='disabled')
         bouton_save.pack()
 
-        def handle_fin_rec(coefs_ffts:np.array):
+        def handle_fin_rec(coefs_ffts: np.array):
             print("finalisation enregistrement")
             progessbar.stop()
             bouton_save.configure(state='normal')
@@ -546,6 +545,7 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
         def lire_personne():
             personne = Personne.get(Personne.id == self.var_id_personne.get())
             audio(personne.nom)
+
         bouton_play = tkinter.Button(master=fenetre, text="Lire", command=lire_personne)
         bouton_play.pack()
         fenetre.pack_slaves()
@@ -592,22 +592,24 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
 
         def afficher_ech_mat():
             echantilon: Echantillon = Echantillon.get(Echantillon.id == var_id_echantillon.get())
-            #coefs_fft = []
-            #for morceau in echantilon.morceaux:
+            # coefs_fft = []
+            # for morceau in echantilon.morceaux:
             #    coefs_fft.append(morceau.coefs)
             self.voir_matrice_ffts(echantilon.matrice, echantilon.personne.nom)
 
-    #        self.donnees = coefs_fft
-    #        self.afficher_graphique()
+        #        self.donnees = coefs_fft
+        #        self.afficher_graphique()
 
         bouton_voir_mat = tkinter.Button(master=fenetre, text="Voir matrice FFT", command=afficher_ech_mat)
         bouton_voir_mat.pack()
+
         def voir_mfcc():
             echantilon: Echantillon = Echantillon.get(Echantillon.id == var_id_echantillon.get())
             coefs_fft = []
             for morceau in echantilon.morceaux:
                 coefs_fft.append(morceau.coefs)
             self.voir_matrice_mfcc(coefs_fft, echantilon.personne.nom)
+
         mfcc_bouton = tkinter.Button(master=fenetre, command=voir_mfcc, text="Voir MFCC")
         mfcc_bouton.pack()
 
@@ -617,6 +619,7 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
 
         play_button = tkinter.Button(master=fenetre, command=lire_echantillon, text="Synthétiser l'Audio")
         play_button.pack()
+
     def recap_bdd(self):
         fenetre = tkinter.Toplevel()
         tableau = ttk.Treeview(fenetre)
@@ -647,24 +650,29 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
         canvas.draw()
         canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
         canvas.draw()
+
         def voir_mfcc():
             self.voir_matrice_mfcc(coefs_fft, nom)
+
         mfcc_bouton = tkinter.Button(master=fenetre, command=voir_mfcc, text="Voir MFCC")
         mfcc_bouton.pack()
+
         def lire_echantillon():
             play_morceau(coefs_fft)
+
         play_button = tkinter.Button(master=fenetre, command=lire_echantillon, text="Synthétiser l'Audio")
         play_button.pack()
+
     def reset_graph_loop(self):
         """Pas nécessaire pour le waterfall"""
         self.reset_graph()
         self.after(3000, self.reset_graph_loop)
 
     def reset_ecoute(self):
-        self.coefs_ffts=[]
-        self.donnees=[]
-        self.waterfall=[]
-        self.waterfall_index=0
+        self.coefs_ffts = []
+        self.donnees = []
+        self.waterfall = []
+        self.waterfall_index = 0
 
     def voir_matrice_mfcc(self, coefs_fft: np.array, nom: str):
         fenetre = tkinter.Toplevel()
@@ -682,16 +690,29 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
     def stats_sql_historique(self):
         fenetre = tkinter.Toplevel()
         tableau = ttk.Treeview(fenetre)
-        tableau['columns'] = ["n_entrees", "conf_min", "conf_avg"]
+        tableau['columns'] = ["nom", "n_entrees", "conf_min", "conf_avg"]
         tableau.heading(column='#0', text="Jour")
-        tableau.heading(column='n_entrees', text="Nombre d'activations")
+        tableau.heading(column='nom', text="Nom")
+        tableau.heading(column='n_entrees', text="Entrées")
         tableau.heading(column='conf_min', text="Confiance minimale")
         tableau.heading(column='conf_avg', text="Confiance Moyenne")
 
-        for day in historique_entrees_par_jour():
-            j = tableau.insert("", 1, text=day['jour'], values=[day['n_entrees'], day['conf_min'], day['conf_avg']])
+        tree_map = {}
+        donnees = historique_jour_et_nom_rollup()
+        for row in donnees:
+            if row['jour'] is not None:
+                if row['nom'] == None:
+                    mr = tableau.insert("", 1, text=str(row['jour']),
+                                        values=["", row['n_entrees'], row['conf_min'], row['conf_avg']])
+                    tree_map[row['jour']] = mr
+        for row in donnees:
+            if row['jour'] is not None:
+                maitre = tree_map[row['jour']]
+                if maitre is not None and row['nom'] is not None:
+                    w = row['jour']
+                    x = [row['nom'], row['n_entrees'], "", row['conf_avg']]
+                    tableau.insert(maitre, "end", text=w, values=x)
         tableau.pack()
-
 
 
 class TestMFCC(P2I):

@@ -1,6 +1,5 @@
-from datetime import datetime, date
+from datetime import datetime
 from io import BytesIO
-from typing import List, Dict
 
 import numpy
 from peewee import *
@@ -111,3 +110,9 @@ def historique_entrees_par_jour():# -> List[Dict[int, date, int]]:
     a = list(donnees)
     #print(a)
     return a
+
+def historique_jour_et_nom_rollup():
+    rows = RawQuery(
+        sql="SELECT date(e.horodatage) as jour, p.nom as nom, count(e.id) as n_entrees, min(e.pourcentage_confiance) as conf_min, AVG(e.pourcentage_confiance) as conf_avg from entree as e, personne as p where p.id=e.personne_id group by date(e.horodatage), p.nom with rollup;"
+    ).bind(maBDD).execute()
+    return rows
