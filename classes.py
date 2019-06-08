@@ -65,7 +65,8 @@ class P2I(object):
     def lancer_reconnaissance_vocale(self):
         print("Reconnaissance vocale dans le terminal")
         if self.serial_port is not None:
-            self.ml = DetecteurDeVoix()
+            if self.ml is not None:
+                self.ml = DetecteurDeVoix()
             if self.serial_port.isOpen():
                 self.reconnaitre_voix()
                 # self.after(1000, self.afficher_fft_realtime)
@@ -325,6 +326,10 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
         self.config(menu=self.menu_bar)
         # Add commands to submenu
         self.file_menu.add_command(label="Analyser un ficher audio WAV", command=self.choisir_fichier_et_analyser)
+        self.file_menu.add_command(label="Charger un modèle de reconnaissance vocale",
+                                   command=self.ouvrir_modele_reconnaissance)
+        self.file_menu.add_command(label="Sauvegarder le modèle de reconnaissance vocale",
+                                   command=self.enregistrer_modele_reconnaissance)
         self.file_menu.add_command(label="Quitter", command=self.destroy)
 
         self.detection_menu.add_command(label="Détecter un loctuer avec Arduino",
@@ -414,7 +419,8 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
     def lancer_reconnaissance_vocale(self):
         classes_valides = ['bastian',
                            'jean']  # les numéros des dossiers avec le nom des personnes à reconnaître 0=bastian, 1=jean
-        self.ml = DetecteurDeVoix()
+        if self.ml is None:
+            self.ml = DetecteurDeVoix()
         print("ml")
         if self.serial_port is not None:
             if self.serial_port.isOpen():
@@ -714,49 +720,21 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
                     tableau.insert(maitre, "end", text=w, values=x)
         tableau.pack()
 
+    def ouvrir_modele_reconnaissance(self):
+        nom_fichier = filedialog.askopenfilename(
+            initialdir=".", title="Choisir un fichier Pickle",
+            filetypes=(("application/python-pickle", "*.pickle"),)
+        )
+        print("Chargement du modèle de classification depuis le fichier {}".format(nom_fichier))
+        if nom_fichier is not None:  # sinon avec 'None' comme argument, ça  va initialiser le modèle
+            self.ml = DetecteurDeVoix(fichier_modele=nom_fichier)
 
-class TestMFCC(P2I):
-    def __init__(self):
-        self.setup_serial()
-        self.read_serial()
-
-    def read_serial(self):
-        morceau_fft = None
-        self.coefs_ffts = []
-        while self.reconnaissance_active:
-            ligne = self.serial_port.readline().replace(b'\r\n', b'')
-            print(ligne, end=" ; ")
-            if ligne == b'restart':
-                self.waterfall, self.waterfall_index = [], 0
-                print("Remise à zéro des tableaux, parlez maintenant")
-                self.coefs_ffts = []
-                morceau_fft = []
-                continue
-            if ligne == b"begin":
-                morceau_fft = []  # une transformée de Fourier
-                continue
-            # if ligne != b'end' and ligne != b'begin' and ligne !=b'\n' and ligne != b'' and ligne != b'restart' and morceau_fft is not None:
-            # print(ligne)
-            try:
-                nombre = float(ligne.decode('utf-8'))
-                if ligne != 'end' and morceau_fft is not None:
-                    morceau_fft.append(nombre / 100)
-            except (UnicodeDecodeError, ValueError):
-                pass
-            if ligne == b'end' and morceau_fft is not None:
-                print_debug("\nlongeur: {}".format(len(morceau_fft)))
-                if len(morceau_fft) == 62:
-                    fft_array = np.array(morceau_fft)
-                    self.coefs_ffts.append(fft_array)
-                else:
-                    print("erreur de taille" + str(len(morceau_fft)))
-                    morceau_fft = None
-                    continue
-                if len(
-                        self.coefs_ffts) > NOMBRE_FFT_RECONNAISSANCE:  # on attend d'avoir quelques échantillons pour éviter de valier un seul faux positif
-                    self.donnees = np.array(self.coefs_ffts)
-                    for y in mfcc(self.donnees, freq_ech):
-                        plt.plot(np.linspace(1, 13, 13), y)
-                        plt.show()
-                    self.coefs_ffts = []  # on reset
-                morceau_fft = None  # pour bien faire sortir les erreurs
+    def enregistrer_modele_reconnaissance(self):
+        fichier = tkinter.filedialog.asksaveasfile(mode='wb', defaultextension=".pickle")
+        print(fichier)
+        if fichier is not None:
+            if self.ml is not None:
+                self.ml.enregistrer_modele(fichier=fichier)
+            else:
+                print("Erreur: aucun modèle de reconnaissance vocale en mémoire - lancez la reconnaissance vocale")
+        fichier.close()

@@ -12,7 +12,6 @@ from scipy.io.wavfile import *
 from scipy.signal.windows import hamming
 from sklearn import metrics
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.tree import DecisionTreeClassifier
 
 from bdd import *
 
@@ -114,10 +113,11 @@ class BaseDetecteur():
             self.modele = modele_qui_predit()
             self.entrainer_modele()
 
-    def enregistrer_modele(self, nom_fichier="decisiontree.pickle"):
-        f = open(nom_fichier, 'wb+')
-        pickle.dump(self.modele, f)
-        f.close()
+    def enregistrer_modele(self, nom_fichier="decisiontree.pickle", fichier=None):
+        if fichier is None:
+            fichier = open(nom_fichier, 'wb+')
+        pickle.dump(self.modele, fichier)
+        fichier.close()
 
     def entrainer_modele(self):
         print("Entraînement de l'arbre de désicion")
