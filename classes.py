@@ -30,7 +30,7 @@ class P2I(object):
     waterfall = [np.linspace(0, 100, 64)]
     waterfall_index = 0
     serial_port: serial.Serial
-    ml: DetecteurDeVoix
+    ml: DetecteurDeVoix = None
 
     graph_change = False
 
@@ -305,11 +305,10 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
     morceau_fft = []
     reconnaissance_active = True
     axes = None
-
     def __init__(self, *args, **kwargs):
         tkinter.Tk.__init__(self, *args, **kwargs)
         self.title("Reconnaissance vocale GUI")
-
+        self.ml = None
         # root.geometry("150x50+0+0")
         # main bar
         self.menu_bar = tkinter.Menu(self)
