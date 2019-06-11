@@ -13,7 +13,7 @@ from serial.tools import list_ports
 
 from classificateur import *
 
-SEUIL_DETECTION = 500
+SEUIL_DETECTION = 100
 NOMBRE_FFT_ENREGISTREMENT = 30
 NOMBRE_FFT_RECONNAISSANCE = 10  # matrice de (x,64) coefficients de fourier
 VERBOSE = False  # pour afficher dans la console les données reçues
@@ -151,6 +151,7 @@ class P2I(object):
     def analyse_detection(self, donnees):
         print("prédiction")
         # classe_pred, probas = ml.predire_classe_probas(self.donnees)
+        print("amplitude max: {}".format(donnees.max()))
         classe_pred, probas, autorise = self.ml.autoriser_personne_probas(donnees)
         if autorise:
             self.serial_port.write(1)
@@ -441,7 +442,7 @@ class GUI(P2I, tkinter.Tk):  # héritage multiple :)
         #          return
         #      for coefs in mfcc(self.donnees, freq_ech):
         #          self.add_plot(np.linspace(1, 13, 13), coefs)
-        if self.graph_change:
+        if self.graph_change and np.array(self.waterfall).shape==(11,13):#and len(self.waterfall[0])>12:
             self.fig.clear()
             self.fig.add_subplot(111).matshow(np.array(self.waterfall))
             self.canvas.draw()
