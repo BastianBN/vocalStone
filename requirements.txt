@@ -9,7 +9,7 @@ entrypoints==0.3
 future==0.17.1
 h5py==2.9.0
 iso8601==0.1.12
-Jinja2==2.10.1
+Jinja2==2.11.3
 joblib==0.13.2
 jsonschema==3.0.1
 kiwisolver==1.0.1
